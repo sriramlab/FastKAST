@@ -240,10 +240,8 @@ def getfullComponent(X, Z, y, dtype = 'quant',center=False,method='Julia'):
     print(f'inverse P1 takes {t1-t0}')
     if center:
         print(f'SVD for PKP')
-        # S = svd(Z.T@Z-(Z.T@P1)@(X.T@Z),compute_uv=False)
         t1 = time.time()
         Z = projection(Z,X,P1)
-        # Z = Z - X@P1@(X.T@Z)
         t0 = time.time()
         print(f'Z operation takes {t1-t0}')
         if method == 'Jax':
@@ -348,9 +346,7 @@ def getfullComponentPerm(X, Z, y, theta = False, dtype = 'quant',center=False,me
         # sq_sigma_e0_perm = (yperm.T@yperm - yperm.T@X@P1@(X.T@yperm))[0]/(n-k)
     else:
         sq_sigma_e0 = y.T@y/n
-    t0 = time.time()
-#   def score_test(sq_sigma_e0, Z, yres, S, decompose=True,center=False):
-    # print(f'Q is {Q}, sq_sigma_e0 is {sq_sigma_e0}')
+    # t0 = time.time()
     p_value1 = score_test2(sq_sigma_e0, Q, S, center=center)
     if Perm:
         p_list = [p_value1]
@@ -361,13 +357,12 @@ def getfullComponentPerm(X, Z, y, theta = False, dtype = 'quant',center=False,me
             sq_sigma_e0_perm = (yperm.T@yperm)[0]/(n-k)
             p_value1_perm = score_test2(sq_sigma_e0_perm, Qperm, S, center=center)
             p_list.append(p_value1_perm)
-        t1 = time.time()
-        print(f'p value test takes {t1-t0}')
+        # t1 = time.time()
+        # print(f'p value test takes {t1-t0}')
         return p_list
     
     return p_value1
    
-    # print(f'p value is {p_value1}, p_value1_perm is {p_value1_perm}')
    
 
 
@@ -530,16 +525,6 @@ if __name__ == "__main__":
             y =  X.dot(beta) + eps
             plist = getfullComponent(X,Z,y,dtype=dtype,center=True,method="Julia")
             print(f'FastKAST p value is {plist[0][0]}')
-            
-            # t1 = time.time()
-            # print(f'get component takes {t1-t0}')
-            # if dtype=='binary':
-            #     z = norm.pdf(norm.ppf(K)) 
-            #     print('mle before is {}'.format(h[0]))
-            #     h[0] = h[0]*(K*(1-K))/(z**2)
-            # print(f'estimated heritability is {h[0]}')
-            # print(f'true sigma 1 is {sigma1sq}, sigma 2 is {sigma2sq}')
-            # print(f'sigma 1 is {h[1]}, sigma 2 is {h[2]}')
             results.append((plist, sigma1sq/(sigma1sq+sigma2sq), N, M, D))
 
     dump(results, f'./test.pkl')
