@@ -1,5 +1,6 @@
 import numpy as np
 import os, re
+import argparse
 from sklearn import linear_model
 from scipy.stats import norm, wishart
 import sys
@@ -12,17 +13,13 @@ from sklearn.linear_model import LinearRegression
 from tqdm import tqdm as tqdm
 from numpy.linalg import svd
 from scipy.sparse import csr_matrix
-from sklearn import preprocessing
+from sklearn.preprocessing import StandardScaler
 import multiprocessing
 import pandas_plink
 from pathlib import Path
 from pandas_plink import read_plink1_bin
-from functools import partial
-from sklearn.linear_model import LinearRegression
-from sklearn.kernel_approximation import AdditiveChi2Sampler
 from sklearn.kernel_approximation import RBFSampler
 from sklearn.metrics.pairwise import pairwise_kernels
-from sklearn.metrics.pairwise import additive_chi2_kernel
 from joblib import dump, load
 from sklearn.model_selection import KFold
 from estimators import *
@@ -68,36 +65,44 @@ def paraCompute(args):
     wlen = end - start
     c = G[:, max(0,start-2*wlen):min(G.shape[1],end+2*wlen)].values
     x = G[:, indices].values
-    
-    c = preprocessing.scale(c)
+    nanfilter=~np.isnan(c).any(axis=1)
+    c = c[nanfilter]
+    x = x[nanfilter]
+    y = Y[nanfilter]
+    # c =  c[:,~np.all(c[1:] == c[:-1], axis=0)]
+    scaler = StandardScaler()
+    c = scaler.fit_transform(c)
+    x = scaler.fit_transform(x)
     print(f'x shape is {x.shape}')
-    print(f'covar shape is {c.shape}') 
+    # print(f'covar shape is {c.shape}') 
     N = x.shape[0]
-    print(f'window shape is {x.shape}')
+    # print(f'window shape is {x.shape}')
     # y = y_new
     d = x.shape[1]
     D = d*Map_Dim
 
     SKATs= []
     SKAT_times = []
-    gammas = np.logspace(-3,1,5)
+    # for hyperparameter selection, simply replace the following list with a list of gamma values
+    gammas = [0.1]
     t0 = time.time()
     for gamma in gammas:
         params = dict(gamma=gamma, kernel_metric='rbf', D=D, center=True, hutReps=250)
-        print('start rbf')
-        (SKAT, bindex),SKAT_time = estimateSigmasGeneral(y, y, c, x, how='fast_mle', params=params, method='Perm')
+        # print('start rbf')
+        SKAT,SKAT_time = estimateSigmasGeneral(y, c, x, how='fast_mle', params=params, method='Perm')
         if len(SKAT) == 0:
             continue
             # return (None,None,None,None,Index,0,0,chrome)
         SKATs.append(SKAT)
         SKAT_times.append(SKAT_time)
     t1 = time.time()
-    pval, p_perm = flatten_p(SKATs),flatten_perm(SKATs)
-    print(pval)
+    (pval,bindex), p_perm = flatten_p(SKATs),flatten_perm(SKATs)
     bgamma = gammas[bindex]
+    print('#######################')
     print(f'best gamma is {bgamma}')
+    print(f'smallest pval is {pval}')
                  
-    return (pval, p_perm, SKAT_times, Index, N, m, chrome, bgamma)
+    return (pval, p_perm, SKAT_times, Index, N, d, chrome, bgamma)
 
 
 
@@ -105,12 +110,12 @@ def parseargs():    # handle user arguments
     parser = argparse.ArgumentParser(description='isoQTL main script.')
     parser.add_argument('--bfile', required=True, help='Plink bfile base name. Required.')
     parser.add_argument('--covar', required=False, help='Covariate file. Not required')
-    parser.add_argument('--phen', required=True, help='Phenotype file. Required')
+    parser.add_argument('--phen',  required=True, help='Phenotype file. Required')
     parser.add_argument('--map', type=int, default=50, help='The mapping dimension divided by m')
     parser.add_argument('--window', type=int, default=100000, help='The physical length of window')
     parser.add_argument('--thread', type=int, default=1, help='Default run on only one thread')
-    parser.add_argument('--superwindow', type=float32, default=2, help='The superwindow is set to a multiple of the set dimension at both ends, default is 2')
-    parser.add_argument('--dir', default='./', help='Path to the output')
+    parser.add_argument('--sw', type=float, default=2, help='The superwindow is set to a multiple of the set dimension at both ends, default is 2')
+    parser.add_argument('--dir', default='./example/', help='Path to the output')
     parser.add_argument('--output', default='sim_results', help='Prefix for output files.')
     args = parser.parse_args()
     return args
@@ -123,15 +128,15 @@ if __name__ == "__main__":
     Map_Dim = args.map
     savepath = '/u/flashscratch/b/boyang19/MoM2/traitsResults/'
     wSize = args.window
-    superWindow= args.superwindow
+    superWindow= args.sw
     orgpath = '/u/project/sriram/ukbiobank/33127/ukb21970_plink/phenos_mapped_33297_to_33127/pheno_files/'
 
     # read genotype data
     path = args.dir
     bfile = args.bfile
-    bed = path+bfile
-    fam = path+bfile
-    bim = path+bfile
+    bed = path+bfile+'.bed'
+    fam = path+bfile+'.fam'
+    bim = path+bfile+'.bim'
     G = read_plink1_bin(bed, bim, fam, verbose=False)
     print('Finish lazy loading the genotype matrix')
 
@@ -154,25 +159,9 @@ if __name__ == "__main__":
         # chunks = math.ceil(M/1000)
     print('Finish preparing the indices')
     
-    famfile = pd.read_csv(fam,sep=' ',header=None)
-    famfile.columns = columns
-    Index = pd.DataFrame({'Index': np.arange(famfile.shape[0])})
-    famfile = famfile.join(Index)
-    famfile = famfile.set_index('IID')
-
-    print(f'in trait {traits}')
-    covariate = pd.read_csv(orgpath+f'{trait}.covar',delimiter=' ').iloc[:,2:].to_numpy()
-    newfam = savepath+f'{trait}.fam'
-    newfamfile = pd.read_csv(newfam,sep=' ',header=None)
-    print(f'new fam file dim is {newfamfile.shape}')
-    newfamfile.columns = columns
-    NIndex = pd.DataFrame({'Index': np.arange(newfamfile.shape[0])})
-    newfamfile = newfamfile.join(NIndex)
-    newfamfile = newfamfile.set_index('IID')
-
     # read phenotype 
     
-    Y = pd.read_csv(path+args.phen,delimiter=' ').pheno.values
+    Y = pd.read_csv(path+args.phen,delimiter=' ').iloc[:,2].values
     print('Finish loading the phenotype matrix')
 
     N = G.shape[0]
@@ -181,8 +170,10 @@ if __name__ == "__main__":
 
     filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
     if args.thread == 1:
-        for w in tqdm(Windows, desc='set'):
-            results.append(paraCompute(w))
+        for p, chrome in enumerate(Windows):
+            print(f'In chromesome: {p+1}')
+            for w in tqdm(chrome, desc='set'):
+                results.append(paraCompute(w))
     else:
         print('start parallel')
         pool = multiprocessing.Pool(processes=32)
