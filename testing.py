@@ -117,6 +117,7 @@ def parseargs():    # handle user arguments
     parser.add_argument('--sw', type=float, default=2, help='The superwindow is set to a multiple of the set dimension at both ends, default is 2')
     parser.add_argument('--dir', default='./example/', help='Path to the output')
     parser.add_argument('--output', default='sim_results', help='Prefix for output files.')
+    parser.add_argument('--region', default='partial', help='region to test, default is to test only on chromosome 1. To test the whole data, change to "all" ')
     args = parser.parse_args()
     return args
 
@@ -151,11 +152,15 @@ if __name__ == "__main__":
     Posits = bimfile.iloc[:,3].values
 
     # prepare index information
+
     for chrome in range(1,23):
         start = np.min(Posits[bimfile.chr==chrome])
         end = np.max(Posits[bimfile.chr==chrome])
         Windows.append([(chrome, w) for w in range(start, end+wSize, wSize)])
     
+    if args.region == 'partial':
+        # only test the first chromosome
+        Windows = [Windows[0]]
         # chunks = math.ceil(M/1000)
     print('Finish preparing the indices')
     
