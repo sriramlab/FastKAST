@@ -230,7 +230,7 @@ def getfullComponent(X, Z, y, dtype = 'quant',center=False,method='Julia'):
     f1 = time.time()
     t0 = time.time()
     n = Z.shape[0]
-    X = np.float32(np.concatenate((np.ones((n,1)),X),axis=1))
+    X = np.concatenate((np.ones((n,1)),X),axis=1)
     y = y.reshape(-1,1)
     k = X.shape[1]
     yperm = np.random.permutation(y)
@@ -303,7 +303,7 @@ def getfullComponentPerm(X, Z, y, theta = False, dtype = 'quant',center=False,me
     P1= inverse(X)
     start = time.time()
     t1 = time.time()
-    print(f'inverse P1 takes {t1-t0}')
+    # print(f'inverse P1 takes {t1-t0}')
     if center:
         # S = svd(Z.T@Z-(Z.T@P1)@(X.T@Z),compute_uv=False)
         t0 = time.time()
@@ -312,7 +312,7 @@ def getfullComponentPerm(X, Z, y, theta = False, dtype = 'quant',center=False,me
         Z = projection(Z,X,P1)
         # Z = Z - X@P1@(X.T@Z)
         t1 = time.time()
-        print(f'Z operation takes {t1-t0}')
+        # print(f'Z operation takes {t1-t0}')
         if method == 'Jax':
             S = jax_svd(Z)
         elif method == 'Julia':
