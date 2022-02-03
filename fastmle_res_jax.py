@@ -3,8 +3,8 @@ from sklearn.kernel_approximation import RBFSampler
 import numpy as np
 from scipy.stats import norm, wishart
 import numpy.linalg as npl
-from scipy.optimize import brent
 from scipy.stats import chi2
+import traceback
 from scipy.optimize import minimize
 import gc
 from scipy.linalg import svd
@@ -18,19 +18,30 @@ import scipy
 from decimal import *
 from scipy.linalg import pinvh
 from chi2comb import chi2comb_cdf, ChiSquared
-from julia.api import Julia
-jl = Julia(compiled_modules=False)
-import julia
-from julia import FameSVD
+
+try:
+    from julia.api import Julia
+    jl = Julia(compiled_modules=False)
+    import julia
+    from julia import FameSVD
+    Julia_FLAG=True
+except Exception:
+    print(traceback.format_exc())
+    print(sys.exc_info()[2])
+    print('Please install julia FameSVD package for SVD speedup. Reverse to scipy package')
+    Julia_FLAG=False
 import scipy
 from numpy.core.umath_tests import inner1d
 
 
-def jax_svd(X):
-    return svd(X, full_matrices = False, compute_uv=False).block_until_ready()
+# def jax_svd(X):
+#     return svd(X, full_matrices = False, compute_uv=False).block_until_ready()
 
 def julia_svd(X):
-    return FameSVD.fsvd(X).S
+    if Julia_FLAG:
+        return FameSVD.fsvd(X).S
+    else:
+        return scipy.linalg.svd(X,full_matrices = False, compute_uv=False)
 
 def scipy_svd(X):
     return scipy.linalg.svd(X,full_matrices = False, compute_uv=False)
@@ -248,7 +259,10 @@ def getfullComponent(X, Z, y, dtype = 'quant',center=False,method='Julia'):
             S = jax_svd(Z)
         elif method == 'Julia':
             # S = julia_svd(Z)
-            S = FameSVD.fsvd(Z).S
+            if Julia_FLAG:
+                S = FameSVD.fsvd(Z).S
+            else:
+                S = scipy.linalg.svd(X,full_matrices = False, compute_uv=False)
         elif method == 'Scipy':
             S = scipy_svd(Z)
         t1 = time.time()
@@ -317,7 +331,10 @@ def getfullComponentPerm(X, Z, y, theta = False, dtype = 'quant',center=False,me
             S = jax_svd(Z)
         elif method == 'Julia':
             # S = julia_svd(Z)
-            S = FameSVD.fsvd(Z).S
+            if Julia_FLAG:
+                S = FameSVD.fsvd(Z).S
+            else:
+                S = scipy.linalg.svd(X,full_matrices = False, compute_uv=False)
         elif method == 'Scipy':
             S = scipy_svd(Z)
         t1 = time.time()
@@ -387,7 +404,10 @@ def getRLComponent(X, Z, y, theta = False, dtype = 'quant',center=False,RL_SKAT=
         if method == 'Jax':
             S = jax_svd(Z)
         elif method == 'Julia': 
-            S = FameSVD.fsvd(Z).S
+            if Julia_FLAG:
+                S = FameSVD.fsvd(Z).S
+            else:
+                S = scipy.linalg.svd(X,full_matrices = False, compute_uv=False)
         elif method == 'Scipy':
             S = scipy_svd(Z)
         S = np.square(S)
