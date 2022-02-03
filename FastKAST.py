@@ -1,27 +1,18 @@
 import numpy as np
 import os, re
 import argparse
-from sklearn import linear_model
-from scipy.stats import norm, wishart
 import sys
 from sys import path as syspath
 from os import path as ospath
 import time
 import math
 import pandas as pd
-from sklearn.linear_model import LinearRegression
 from tqdm import tqdm as tqdm
-from numpy.linalg import svd
-from scipy.sparse import csr_matrix
 from sklearn.preprocessing import StandardScaler
 import multiprocessing
 import pandas_plink
-from pathlib import Path
 from pandas_plink import read_plink1_bin
-from sklearn.kernel_approximation import RBFSampler
-from sklearn.metrics.pairwise import pairwise_kernels
 from joblib import dump, load
-from sklearn.model_selection import KFold
 from estimators import *
 from utils import *
 
@@ -127,17 +118,15 @@ if __name__ == "__main__":
     args = parseargs()
     # set parameters
     Map_Dim = args.map
-    savepath = '/u/flashscratch/b/boyang19/MoM2/traitsResults/'
     wSize = args.window
     superWindow= args.sw
-    orgpath = '/u/project/sriram/ukbiobank/33127/ukb21970_plink/phenos_mapped_33297_to_33127/pheno_files/'
 
     # read genotype data
-    path = args.dir
+    savepath = args.output
     bfile = args.bfile
-    bed = path+bfile+'.bed'
-    fam = path+bfile+'.fam'
-    bim = path+bfile+'.bim'
+    bed = bfile+'.bed'
+    fam = bfile+'.fam'
+    bim = bfile+'.bim'
     G = read_plink1_bin(bed, bim, fam, verbose=False)
     print('Finish lazy loading the genotype matrix')
 
@@ -166,7 +155,7 @@ if __name__ == "__main__":
     
     # read phenotype 
     
-    Y = pd.read_csv(path+args.phen,delimiter=' ').iloc[:,2].values
+    Y = pd.read_csv(args.phen,delimiter=' ').iloc[:,2].values
     print('Finish loading the phenotype matrix')
 
     N = G.shape[0]
@@ -185,4 +174,4 @@ if __name__ == "__main__":
         results = pool.map(paraCompute,Windows[chr_index][int(start_index):int(end_index)])
         pool.close()
         pool.join()
-    dumpfile(results,path,filename,overwrite=True)
+    dumpfile(results,savepath,filename,overwrite=True)
