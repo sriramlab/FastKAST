@@ -75,7 +75,6 @@ def paraCompute(args):
     SKATs= []
     SKAT_times = []
     # for hyperparameter selection, simply replace the following list with a list of gamma values
-    gammas = [0.1]
     t0 = time.time()
     for gamma in gammas:
         params = dict(gamma=gamma, kernel_metric='rbf', D=D, center=True, hutReps=250)
@@ -90,8 +89,8 @@ def paraCompute(args):
     (pval,bindex), p_perm = flatten_p(SKATs),flatten_perm(SKATs)
     bgamma = gammas[bindex]
     print('#######################')
-    print(f'best gamma is {bgamma}')
-    print(f'smallest pval is {pval}')
+    print(f'hyperparameter gamma is {bgamma}')
+    print(f'pval is {pval}')
                  
     return (pval, p_perm, SKAT_times, Index, N, d, chrome, bgamma)
 
@@ -130,9 +129,9 @@ if __name__ == "__main__":
     G = read_plink1_bin(bed, bim, fam, verbose=False)
     print('Finish lazy loading the genotype matrix')
 
-    bimfile = pd.read_csv(bim,sep='\t',header=None)
+    bimfile = pd.read_csv(bim,delim_whitespace=True,header=None)
     bimfile.columns = ['chr', 'chrpos', 'MAF', 'pos','MAJ','MIN']
-    famfile = pd.read_csv(fam,sep=' ',header=None)
+    famfile = pd.read_csv(fam,delim_whitespace=True,header=None)
     columns = ['FID','IID','Fa','Mo','Sex','Phi']
     famfile.columns = columns
     # in total 22 indices, represent 22 chromosome
@@ -141,8 +140,8 @@ if __name__ == "__main__":
     Posits = bimfile.iloc[:,3].values
 
     # prepare index information
-
-    for chrome in range(1,23):
+    chromes = np.unique(bimfile.chr)
+    for chrome in chromes:
         start = np.min(Posits[bimfile.chr==chrome])
         end = np.max(Posits[bimfile.chr==chrome])
         Windows.append([(chrome, w) for w in range(start, end+wSize, wSize)])
@@ -155,14 +154,16 @@ if __name__ == "__main__":
     
     # read phenotype 
     
-    Y = pd.read_csv(args.phen,delimiter=' ').iloc[:,2].values
+    Y = pd.read_csv(args.phen,delimiter=' ',header=None).iloc[:,5].values
     print('Finish loading the phenotype matrix')
 
     N = G.shape[0]
     AM = G.shape[1]
     results = []
+    gammas = [0.1] # to perform testing with multiple hyperparameter gamma, simply put the candidates here
 
     filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
+    filename = filename.split('/')[-1]
     if args.thread == 1:
         for p, chrome in enumerate(Windows):
             print(f'In chromesome: {p+1}')

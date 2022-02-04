@@ -1,7 +1,7 @@
 #!/bin/sh
 
 
-gen=./example/all
-phe=./example/all.pheno
+gen=./example/sim
+phe=./example/sim.pheno
 
 python FastKAST.py --bfile ${gen} --phen ${phe}
