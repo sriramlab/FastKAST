@@ -6,6 +6,7 @@ import numpy.linalg as npl
 from scipy.stats import chi2
 import traceback
 from scipy.optimize import minimize
+import sys
 import gc
 from scipy.linalg import svd
 import time
@@ -15,7 +16,6 @@ from numba import njit
 from numpy.linalg import eig
 from scipy.linalg import eigh
 import scipy
-from decimal import *
 from scipy.linalg import pinvh
 from chi2comb import chi2comb_cdf, ChiSquared
 
