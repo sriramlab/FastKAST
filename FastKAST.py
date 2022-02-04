@@ -163,7 +163,7 @@ if __name__ == "__main__":
     gammas = [0.1] # to perform testing with multiple hyperparameter gamma, simply put the candidates here
 
     filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
-    filename = filename.split('/')[-1]
+    filename = '/'+filename.split('/')[-1]
     if args.thread == 1:
         for p, chrome in enumerate(Windows):
             print(f'In chromesome: {p+1}')
