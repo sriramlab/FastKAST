@@ -147,6 +147,7 @@ if __name__ == "__main__":
         Windows.append([(chrome, w) for w in range(start, end+wSize, wSize)])
     
     if args.region == 'partial':
+        print(f'partial region')
         # only test the first chromosome
         Windows = [Windows[0]]
         # chunks = math.ceil(M/1000)

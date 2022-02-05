@@ -4,4 +4,4 @@
 gen=./example/sim
 phe=./example/sim.pheno
 
-python FastKAST.py --bfile ${gen} --phen ${phe}
+python FastKAST.py --bfile ${gen} --phen ${phe} --region all
