@@ -73,18 +73,18 @@ def paraCompute(args):
     D = d*Map_Dim
 
     SKATs= []
-    SKAT_times = []
+    FastKAST_times = []
     # for hyperparameter selection, simply replace the following list with a list of gamma values
     t0 = time.time()
     for gamma in gammas:
         params = dict(gamma=gamma, kernel_metric='rbf', D=D, center=True, hutReps=250)
         # print('start rbf')
-        SKAT,SKAT_time = estimateSigmasGeneral(y, c, x, how='fast_mle', params=params, method='Perm')
+        SKAT,FastKAST_time = estimateSigmasGeneral(y, c, x, how='fast_mle', params=params, method='Perm')
         if len(SKAT) == 0:
             continue
             # return (None,None,None,None,Index,0,0,chrome)
         SKATs.append(SKAT)
-        SKAT_times.append(SKAT_time)
+        FastKAST_times.append(FastKAST_time)
     t1 = time.time()
     (pval,bindex), p_perm = flatten_p(SKATs),flatten_perm(SKATs)
     bgamma = gammas[bindex]
@@ -92,7 +92,7 @@ def paraCompute(args):
     print(f'hyperparameter gamma is {bgamma}')
     print(f'pval is {pval}')
                  
-    return (pval, p_perm, SKAT_times, Index, N, d, chrome, bgamma)
+    return (pval, p_perm, FastKAST_times, Index, N, d, chrome, bgamma)
 
 
 
