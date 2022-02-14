@@ -56,6 +56,8 @@ def paraCompute(args):
     wlen = end - start
     c = G[:, max(0,start-2*wlen):min(G.shape[1],end+2*wlen)].values
     x = G[:, indices].values
+    if covar != None:
+        c = np.concatenate((c,covarfile),axis=1)
     nanfilter=~np.isnan(c).any(axis=1)
     c = c[nanfilter]
     x = x[nanfilter]
@@ -138,6 +140,13 @@ if __name__ == "__main__":
     # bimfile = bimfile[bimfile.chr==chrome]
     Windows = [] 
     Posits = bimfile.iloc[:,3].values
+
+    # prepare covariate
+    covar = args.covar
+    if covar != None:
+        covarfile = pd.read_csv(covar,delim_whitespace=True)
+        assert covarfile.iloc[:,0].equals(famfile.FID)
+        covarfile = covarfile.iloc[:,2:]
 
     # prepare index information
     chromes = np.unique(bimfile.chr)
