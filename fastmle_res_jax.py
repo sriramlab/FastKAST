@@ -334,7 +334,7 @@ def getfullComponentPerm(X, Z, y, theta = False, dtype = 'quant',center=False,me
             if Julia_FLAG:
                 S = FameSVD.fsvd(Z).S
             else:
-                S = scipy.linalg.svd(X,full_matrices = False, compute_uv=False)
+                S = scipy.linalg.svd(Z,full_matrices = False, compute_uv=False)
         elif method == 'Scipy':
             S = scipy_svd(Z)
         t1 = time.time()
