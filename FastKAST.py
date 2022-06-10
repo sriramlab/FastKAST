@@ -58,6 +58,7 @@ def paraCompute(args):
     x = G[:, indices].values
     if covar != None:
         c = np.concatenate((c,covarfile),axis=1)
+    c = np.concatenate((covarfile,c),axis=1)
     nanfilter=~np.isnan(c).any(axis=1)
     c = c[nanfilter]
     x = x[nanfilter]
