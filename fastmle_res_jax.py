@@ -1,10 +1,9 @@
 from sklearn.metrics.pairwise import pairwise_kernels
 from sklearn.kernel_approximation import RBFSampler
 import numpy as np
-from scipy.stats import norm, wishart
-import numpy.linalg as npl
 from scipy.stats import chi2
 import traceback
+from sklearn.utils.extmath import randomized_svd
 from scipy.optimize import minimize
 import sys
 import gc
@@ -12,12 +11,17 @@ from scipy.linalg import svd
 import time
 from numpy.linalg import inv
 from joblib import dump, load
-from numba import njit
 from numpy.linalg import eig
 from scipy.linalg import eigh
 import scipy
 from scipy.linalg import pinvh
 from chi2comb import chi2comb_cdf, ChiSquared
+
+try:
+    import dask
+    import dask.array as da
+except:
+    print('Warning: cannot use dask')
 
 try:
     from julia.api import Julia
@@ -75,7 +79,7 @@ def score_test(S):
     dofs = np.ones(k)
     ncents = np.zeros(k)
     chi2s = [ChiSquared(S[i], ncents[i], dofs[i]) for i in range(k)]
-    p, error, info = chi2comb_cdf(0, chi2s, 0, lim = 1000000, atol=1e-14)
+    p, error, info = chi2comb_cdf(0, chi2s, 0, lim = 1000000, atol=1e-20)
     # p = qf.qf(0, Phi, acc = 1e-7)[0] 
     return (1-p,error)
 
@@ -89,7 +93,7 @@ def score_test2(sq_sigma_e0, Q, S, decompose=True,center=False):
     ncents = np.zeros(k)
     chi2s = [ChiSquared(Phi[i], ncents[i], dofs[i]) for i in range(k)]
     t0 = time.time()
-    p, error, info = chi2comb_cdf(Qe, chi2s, 0, lim= 1000000, atol=1e-14)
+    p, error, info = chi2comb_cdf(Qe, chi2s, 0, lim= 1000000, atol=1e-20)
     # p = qf.qf(0, Phi, acc = 1e-7)[0] 
     t1 = time.time()
     return (1-p,error)
@@ -235,7 +239,7 @@ def inverse(X):
     return pinvh(X.T@X)
     # return pinvh(X.T@X)
 
-def getfullComponent(X, Z, y, dtype = 'quant',center=False,method='Julia'):
+def getfullComponent(X, Z, y, dtype = 'quant',center=False,method='Scipy'):
     # X is the covariates that need to be regressed out, res is the residule after regressing out the linear effect
     # delta is the initial guess of delta value
     f1 = time.time()
@@ -304,10 +308,10 @@ def getfullComponent(X, Z, y, dtype = 'quant',center=False,method='Julia'):
 
 
 
-def getfullComponentPerm(X, Z, y, theta = False, dtype = 'quant',center=False,method='Julia',Perm=10):
+def getfullComponentPerm(X, Z, y, theta = False, dtype = 'quant',center=False,method='Scipy',Perm=10):
     # X is the covariates that need to be regressed out, res is the residule after regressing out the linear effect
     # delta is the initial guess of delta value
-    f1 = time.time()
+    print(f'use {method}')
     t0 = time.time()
     n = Z.shape[0]
     X = np.concatenate((np.ones((n,1)),X),axis=1)
@@ -337,6 +341,14 @@ def getfullComponentPerm(X, Z, y, theta = False, dtype = 'quant',center=False,me
                 S = scipy.linalg.svd(Z,full_matrices = False, compute_uv=False)
         elif method == 'Scipy':
             S = scipy_svd(Z)
+        # elif method == 'dask':
+        #     Z = dask.array.from_array(Z)
+        #     _,S,_ = da.linalg.svd(Z)
+            # S = np.asarray(S)
+            # Z = np.asarray(Z)
+
+
+            
         t1 = time.time()
         print(f'svd takes {t1-t0}')
         t0 = time.time()
