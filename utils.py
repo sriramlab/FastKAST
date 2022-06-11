@@ -1,6 +1,12 @@
 import os.path
 from joblib import dump, load
 import glob
+import time
+import numpy as np
+from scipy.stats import qmc
+# from numba_stats import norm
+from scipy.stats import norm
+from numba import jit
 def dumpfile(data, path, filename, overwrite=False):
     isdir = os.path.isdir(path)
     if not isdir:
@@ -32,6 +38,63 @@ def fileExist(path, filename):
         return False
     return True
 
+@jit(nopython=True)
+def sin_cos(X,method='sin'):
+    if method=='sin':
+        results = np.sin(X)
+    else:
+        results = np.cos(X)
+    return results
+
+
+
+
+class QMC_RFF:
+    def __init__(self, gamma, d, n_components,seed=None,QMC='Halton'):
+        assert n_components%2 ==0
+        self.gamma = gamma
+        self.n_components = n_components
+        self.seed = seed
+        self.QMC = QMC
+        if QMC=='Halton':
+            sampler = qmc.Halton(d=d,seed=seed)
+            self.sampler = sampler
+        elif QMC=='Sobol':
+            sampler = qmc.Sobol(d=d,seed=seed)
+            self.sampler = sampler
+        else:
+            raise ValueError(f"{QMC} is currently not supported")
+
+
+    # @jit(nopython=True)
+    def fit_transform(self,X):
+        n_components = self.n_components
+        sampler = self.sampler
+        ts = sampler.random(n=n_components//2)
+        gamma = self.gamma
+        # t0 = time.time()
+        W = norm.ppf(ts,scale=np.sqrt(2*gamma)).T
+        # t1 = time.time()
+        # print(f'get W takes {t1-t0}')
+        self.W = W
+        projection = X@W
+        # t0 = time.time()
+        sin = np.sin(projection)
+        cos = np.cos(projection)
+        # sin = sin_cos(projection)
+        # cos = sin_cos(projection,method='cos')
+        # t1 = time.time()
+        # print(f'sin cos takes {t1-t0}')
+        Combine = np.empty((sin.shape[0],2*sin.shape[1]), dtype=float)
+        Combine[:,0::2] = sin
+        Combine[:,1::2] = cos
+        # t1 = time.time()
+        # print(f'assign takes {t1-t0}')
+        # t0 = time.time()
+        Combine *= np.sqrt(2.)/np.sqrt(n_components)
+        # t1 = time.time()
+        # print(f'Combin mult takes {t1-t0}')
+        return np.float32(Combine)
 
 
 if __name__ == "__main__":
