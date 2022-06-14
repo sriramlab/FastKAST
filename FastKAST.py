@@ -20,6 +20,7 @@ from utils import *
 def flatten_perm(pairs):
     N = len(pairs) # N is the number of hyperparamter
     M = len(pairs[0]) # M is the number of windows tested
+    print(pairs)
     p_all = []
     for n in range(N):
         p_row = []
@@ -168,7 +169,7 @@ def parseargs():    # handle user arguments
     parser.add_argument('--window', type=int, default=100000, help='The physical length of window')
     parser.add_argument('--thread', type=int, default=1, help='Default run on only one thread')
     parser.add_argument('--sw', type=int, default=2, help='The superwindow is set to a multiple of the set dimension at both ends, default is 2')
-    parser.add_argument('--mc', default='None', choices=['None', 'Halton','Sobol'], help='sampling method for RFF')
+    parser.add_argument('--mc', default='Vanilla', choices=['Vanilla', 'Halton','Sobol'], help='sampling method for RFF')
     parser.add_argument('--output', default='sim_results', help='Prefix for output files.')
     parser.add_argument('--region', default='partial', help='region to test, default is to test only on chromosome 1. To test the whole data, change to "all" ')
     parser.add_argument('--filename', default='sim', help='output file name')
@@ -235,7 +236,7 @@ if __name__ == "__main__":
     N = G.shape[0]
     AM = G.shape[1]
     results = []
-    gammas = [0.1] # to perform testing with multiple hyperparameter gamma, simply put the candidates here
+    gammas = [0.01, 0.1] # to perform testing with multiple hyperparameter gamma, simply put the candidates here
 
     # filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
     filename = args.filename +'.pkl'
