@@ -84,7 +84,6 @@ def paraCompute(args):
     print(f'read value takes {t1-t0}')
     if covar != None:
         c = np.concatenate((c,covarfile),axis=1)
-    c = np.concatenate((covarfile,c),axis=1)
     t0 = time.time()
     nanfilter=~np.isnan(c).any(axis=1)
     t1 = time.time()
@@ -95,6 +94,8 @@ def paraCompute(args):
     # c =  c[:,~np.all(c[1:] == c[:-1], axis=0)]
     scaler = StandardScaler()
     t0 = time.time()
+    x = np.unique(x, axis=1, return_index=False)
+    c = np.unique(c, axis=1, return_index=False)
     c = scaler.fit_transform(c)
     x = scaler.fit_transform(x)
     t1 = time.time()
@@ -112,10 +113,14 @@ def paraCompute(args):
     # for hyperparameter selection, simply replace the following list with a list of gamma values
     t0 = time.time()
     for gamma in gammas:
-        params = dict(gamma=gamma, kernel_metric='rbf', D=D, center=True, hutReps=250, version='Halton')
+        params = dict(gamma=gamma, kernel_metric='rbf', D=D, center=True, hutReps=250, version=QMC)
         # params = dict(gamma=gamma, kernel_metric='rbf', D=D, center=True, hutReps=250)
         # print('start rbf')
+        print(f'Start computing FastKAST')
         SKAT,FastKAST_time, states = estimateSigmasGeneral(y, c, x, how='fast_mle', params=params, method=HP)
+        print(f'Start computing Exact kernel')
+        # SKAT_MLE,Exact_time, mle_states  = estimateSigmasGeneral(y, c, x, how='mle', params=params)
+        SKAT_MLE = None
         if len(SKAT) == 0:
             continue
             # return (None,None,None,None,Index,0,0,chrome)
@@ -128,7 +133,7 @@ def paraCompute(args):
     if len(gammas) == 1:
         pval = SKATs[0][0]
         print(f'pval is {pval}')   
-        return (pval, None, FastKAST_times, Index, N, d, chrome, None, states)
+        return (pval, None, FastKAST_times, Index, N, d, chrome, None, states, SKAT_MLE)
     elif HP =='Perm':
         (pval,bindex), p_perm = flatten_p(SKATs),flatten_perm(SKATs)
         bgamma = gammas[bindex]
@@ -163,8 +168,10 @@ def parseargs():    # handle user arguments
     parser.add_argument('--window', type=int, default=100000, help='The physical length of window')
     parser.add_argument('--thread', type=int, default=1, help='Default run on only one thread')
     parser.add_argument('--sw', type=int, default=2, help='The superwindow is set to a multiple of the set dimension at both ends, default is 2')
+    parser.add_argument('--mc', default='None', choices=['None', 'Halton','Sobol'], help='sampling method for RFF')
     parser.add_argument('--output', default='sim_results', help='Prefix for output files.')
     parser.add_argument('--region', default='partial', help='region to test, default is to test only on chromosome 1. To test the whole data, change to "all" ')
+    parser.add_argument('--filename', default='sim', help='output file name')
     args = parser.parse_args()
     return args
 
@@ -178,7 +185,7 @@ if __name__ == "__main__":
     Map_Dim = args.map
     wSize = args.window
     superWindow= args.sw
-
+    QMC = args.mc
     # read genotype data
     savepath = args.output
     bfile = args.bfile
@@ -200,6 +207,7 @@ if __name__ == "__main__":
 
     # prepare covariate
     covar = args.covar
+    print(f'covar is {covar}')
     if covar != None:
         covarfile = pd.read_csv(covar,delim_whitespace=True)
         assert covarfile.iloc[:,0].equals(famfile.FID)
@@ -221,16 +229,16 @@ if __name__ == "__main__":
     
     # read phenotype 
     
-    Y = pd.read_csv(args.phen,delimiter=' ').iloc[:,-1].values
+    Y = pd.read_csv(args.phen,delim_whitespace=True).iloc[:,-1].values
     print('Finish loading the phenotype matrix')
 
     N = G.shape[0]
     AM = G.shape[1]
     results = []
-    gammas = [0.01,0.1,1] # to perform testing with multiple hyperparameter gamma, simply put the candidates here
+    gammas = [0.1] # to perform testing with multiple hyperparameter gamma, simply put the candidates here
 
-    filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
-    filename = '/'+filename.split('/')[-1]
+    # filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
+    filename = args.filename +'.pkl'
     if args.thread == 1:
         count = 0
         for p, chrome in enumerate(Windows):
@@ -238,10 +246,11 @@ if __name__ == "__main__":
             for w in tqdm(chrome, desc='set'):
                 count += 1
                 results.append(paraCompute(w))
+                dumpfile(results,savepath,filename,overwrite=True)
     else:
         print('start parallel')
         pool = multiprocessing.Pool(processes=32)
         results = pool.map(paraCompute,Windows[chr_index][int(start_index):int(end_index)])
         pool.close()
         pool.join()
-    dumpfile(results,savepath,filename,overwrite=True)
+        dumpfile(results,savepath,filename,overwrite=True)

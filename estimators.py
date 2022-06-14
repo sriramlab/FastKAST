@@ -31,7 +31,8 @@ def estimateSigmasGeneral(y, Xc, X, params=None, how='rand_mom',Random_state=1,m
         Kernel_Time = t1-t0
         states = [H[1] for H in h]
         pvals = [H[0] for H in h]
-        print(f'get components takes {t1-t0}')
+        print(f'mle pvals are: {pvals}')
+        # print(f'get components takes {t1-t0}')
         return (pvals,Kernel_Time,states)
  
     elif how == 'fast_mle':
@@ -39,22 +40,23 @@ def estimateSigmasGeneral(y, Xc, X, params=None, how='rand_mom',Random_state=1,m
         # print( gamma)
         t0 = time.time()
         center=params['center']
-        if 'version' in params:
-            # if params['version'] == 1:
-            #     rbfs = RBFSampler(gamma=gamma, n_components=params['D'],random_state=Random_state)
-            #     Z = rbfs.fit_transform(X)
-            # elif params['version'] == 2:
-            #     Z = RFF_fit_transform(X,params['D'],gamma,seed=Random_state)
-            QMC=params['version']
-            # print(QMC)
-            # t0 = time.time()
-            Z = QMC_RFF(gamma=gamma,d=X.shape[1],n_components=params['D'],seed=Random_state,QMC=QMC).fit_transform(X)
-            # t1 = time.time()
-            # print(f'Halton constructin takes {t1-t0}')
-
-        else:
+        # if params['version'] == 1:
+        #     rbfs = RBFSampler(gamma=gamma, n_components=params['D'],random_state=Random_state)
+        #     Z = rbfs.fit_transform(X)
+        # elif params['version'] == 2:
+        #     Z = RFF_fit_transform(X,params['D'],gamma,seed=Random_state)
+        QMC=params['version']
+        # print(QMC)
+        # t0 = time.time()
+        if QMC=='Vanilla':
             rbfs = RBFSampler(gamma=gamma, n_components=params['D'],random_state=Random_state)
             Z = rbfs.fit_transform(X)
+        else:
+            Z = QMC_RFF(gamma=gamma,d=X.shape[1],n_components=params['D'],seed=Random_state,QMC=QMC).fit_transform(X)
+        # t1 = time.time()
+        # print(f'Halton constructin takes {t1-t0}')
+
+            
         t1 = time.time()
         # print('Z takes {}'.format(t1-t0))
         n = X.shape[0]
