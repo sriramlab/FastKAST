@@ -17,7 +17,7 @@ from fastmle_res_jax import getmleComponent
 from sklearn.impute import SimpleImputer
 from utils import QMC_RFF
 
-def estimateSigmasGeneral(y, Xc, X, params=None, how='rand_mom',Random_state=1,method='SKAT'):
+def estimateSigmasGeneral(y, Xc, X, params=None, how='rand_mom',Random_state=1,method='Perm',Test='nonlinear'):
     np.random.seed(int.from_bytes(os.urandom(4), byteorder='little'))
 
     
@@ -53,6 +53,10 @@ def estimateSigmasGeneral(y, Xc, X, params=None, how='rand_mom',Random_state=1,m
             Z = rbfs.fit_transform(X)
         else:
             Z = QMC_RFF(gamma=gamma,d=X.shape[1],n_components=params['D'],seed=Random_state,QMC=QMC).fit_transform(X)
+        
+        print(f'Test version is {Test}')   
+        # if Test=='general': #commented out in Sep 4th
+        #     Z = np.concatenate((X,Z),axis=1)
         # t1 = time.time()
         # print(f'Halton constructin takes {t1-t0}')
 
@@ -87,7 +91,7 @@ def estimateSigmasGeneral(y, Xc, X, params=None, how='rand_mom',Random_state=1,m
             return (pvals,SKAT_time,states)
         elif method=='Perm':
             t0 = time.time()
-            h = getfullComponentPerm(Xc, Z, y, center=center)
+            h = getfullComponentPerm(Xc, Z, y, center=center, Test=Test, Perm=100)
             states = [H[1] for H in h]
             pvals = [H[0] for H in h]
             t1 = time.time()
@@ -119,9 +123,11 @@ def estimateSigmasGeneral(y, Xc, X, params=None, how='rand_mom',Random_state=1,m
         
 
     elif how == 'fast_lin':
+        print(f'Compute linear effect (SKAT)')
         center=params['center']
         Z = (X)/np.sqrt(X.shape[1]) 
-        h = getfullComponent(Xc, Z, y, center=center)
+        print(f'Z shape is {Z.shape}, Xc shape is {Xc.shape}')
+        h = getfullComponent1(Xc, Z, y, center=center)
         return h
 
     elif how == 'quad':
