@@ -304,12 +304,19 @@ def getfullComponent(X, Z, y, dtype = 'quant',center=False,method='Scipy'):
 
 
 
-def getfullComponentPerm(X, Z, y, theta = False, dtype = 'quant',center=False,method='Scipy',Perm=10):
+def getfullComponentPerm(X, Z, y, dtype = 'quant',center=True,method='Scipy',Perm=10, Test='nonlinear'):
     # X is the covariates that need to be regressed out, res is the residule after regressing out the linear effect
     # delta is the initial guess of delta value
     print(f'use {method}')
     t0 = time.time()
     n = Z.shape[0]
+    if Test == 'general':
+        if X.size == 0:
+            X = np.ones(n,1)
+        else:
+            X = np.concatenate((np.ones((n,1)),X),axis=1)
+    else:
+        X = np.concatenate((np.ones((n,1)),X),axis=1)
     X = np.concatenate((np.ones((n,1)),X),axis=1)
     y = y.reshape(-1,1)
     k = X.shape[1]
