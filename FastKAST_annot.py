@@ -30,7 +30,7 @@ def flatten_perm(pairs):
         p_all.append(p_row)
     p_all = np.array(p_all)
     p_min = np.amin(p_all,axis=0)
-    return list(p_min[:10])
+    return list(p_min)
 
 def flatten_p(pairs,complete=False):
     N = len(pairs) # N is the number of hyperparamter
@@ -266,7 +266,7 @@ if __name__ == "__main__":
     N = G.shape[0]
     AM = G.shape[1]
     results = []
-    gammas = [0.1] # to perform testing with multiple hyperparameter gamma, simply put the candidates here
+    gammas = [0.1,1,10] # to perform testing with multiple hyperparameter gamma, simply put the candidates here
 
     # filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
     filename = args.filename 
