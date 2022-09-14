@@ -45,7 +45,7 @@ p value = 2: p value calculation error
 ```
 
 ## Exmaple
-To run the demo code, you can run
+To run the demo code with a fixed window size, you can run
 ```
 python FastKAST.py --bfile ./example/sim --phen ./example/sim.pheno
 ```
@@ -54,3 +54,11 @@ or directly run
 sh run.sh
 ```
 
+To run the demo code with a customized window size, you can generate a annotation file with "start_index end_index" as a row, and run
+```
+python FastKAST_annot.py --bfile ./example/sim --phen ./example/sim.pheno --annot ./example/sim.annot
+```
+Or directly run
+```
+sh run_annot.sh
+```
