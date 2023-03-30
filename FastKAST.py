@@ -10,8 +10,9 @@ import pandas as pd
 from tqdm import tqdm as tqdm
 from sklearn.preprocessing import StandardScaler
 import multiprocessing
-import pandas_plink
-from pandas_plink import read_plink1_bin
+from bed_reader import open_bed
+# import pandas_plink
+# from pandas_plink import read_plink1_bin
 from joblib import dump, load
 from estimators import *
 from utils import *
@@ -79,8 +80,10 @@ def paraCompute(args):
     end = indices[-1]
     wlen = end - start
     t0 = time.time()
-    c = G[:, max(0,start-superWindow*wlen):min(G.shape[1],end+superWindow*wlen)].values
-    x = G[:, indices].values
+    c = 2-G.read(index=np.s_[Yeffect,max(0,start-superWindow*wlen):min(G.shape[1],end+superWindow*wlen)])
+    # c = G[:, max(0,start-superWindow*wlen):min(G.shape[1],end+superWindow*wlen)].values
+    # x = G[:, indices].values
+    x = 2-G.read(index=np.s_[Yeffect,indices])
     t1 = time.time()
     print(f'read value takes {t1-t0}')
     if covar != None:
@@ -193,7 +196,8 @@ if __name__ == "__main__":
     bed = bfile+'.bed'
     fam = bfile+'.fam'
     bim = bfile+'.bim'
-    G = read_plink1_bin(bed, bim, fam, verbose=False)
+    G = open_bed(bed)
+    # G = read_plink1_bin(bed, bim, fam, verbose=False)
     print('Finish lazy loading the genotype matrix')
 
     bimfile = pd.read_csv(bim,delim_whitespace=True,header=None)
@@ -231,6 +235,8 @@ if __name__ == "__main__":
     # read phenotype 
     
     Y = pd.read_csv(args.phen,delim_whitespace=True).iloc[:,-1].values
+    Yeffect = (Y!=-9)&(~np.isnan(Y))
+    Y = Y[Yeffect]
     print('Finish loading the phenotype matrix')
 
     N = G.shape[0]

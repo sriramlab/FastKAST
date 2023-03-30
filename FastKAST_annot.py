@@ -11,6 +11,7 @@ from tqdm import tqdm as tqdm
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import PolynomialFeatures
 import multiprocessing
+from bed_reader import open_bed
 import pandas_plink
 from pandas_plink import read_plink1_bin
 from joblib import dump, load
@@ -21,7 +22,7 @@ from utils import *
 def flatten_perm(pairs):
     N = len(pairs) # N is the number of hyperparamter
     M = len(pairs[0]) # M is the number of windows tested
-    print(pairs)
+    # print(pairs)
     p_all = []
     for n in range(N):
         p_row = []
@@ -78,10 +79,12 @@ def paraCompute(args):
     t0 = time.time()
     try:
         if Test!='general':
-            c = G[Yeffect, max(0,start-superWindow*wlen):min(G.shape[1],end+superWindow*wlen)].values
+            c = 2-G.read(index=np.s_[Yeffect,max(0,start-superWindow*wlen):min(G.shape[1],end+superWindow*wlen)]) ## 2-G replicate the old conversion scheme
+            # c = G[Yeffect, max(0,start-superWindow*wlen):min(G.shape[1],end+superWindow*wlen)].values
         else:
             c = np.array([])
-        x = G[Yeffect, start:end].values
+        x = 2-G.read(index=np.s_[Yeffect,start:end])
+        # x = G[Yeffect, start:end].values
     except Exception as e:
         print(f'Error: {e}')
         print(f'start: {start}, end: {end}, Yeffect: {Yeffect}')
@@ -127,9 +130,9 @@ def paraCompute(args):
         c = scaler.fit_transform(c)
     x = scaler.fit_transform(x)
     t1 = time.time()
-    print(f'standardized takes {t1-t0}')
-    print(f'x shape is {x.shape}')
-    print(f'c shape is {c.shape}')
+    # print(f'standardized takes {t1-t0}')
+    # print(f'x shape is {x.shape}')
+    # print(f'c shape is {c.shape}')
     # print(f'covar shape is {c.shape}') 
     N = x.shape[0]
     # print(f'window shape is {x.shape}')
@@ -168,7 +171,7 @@ def paraCompute(args):
         bgamma = gammas[bindex]
         print('#######################')
         print(f'hyperparameter gamma is {bgamma}')
-        print(f'pval is {pval}')     
+        # print(f'pval is {pval}')     
         return (pval, p_perm, FastKAST_times, start_index, end_index, N, d, bgamma, states, count)
     elif HP=='CCT':
         pvals,bindex = flatten_p(SKATs,complete=True)
@@ -202,6 +205,7 @@ def parseargs():    # handle user arguments
     parser.add_argument('--annot', help='Provided annotation file')
     parser.add_argument('--filename', default='sim', help='output file name')
     parser.add_argument('--test', default='nonlinear', choices=['nonlinear', 'higher','general'], help='What type of kernel to test')
+    parser.add_argument('--gammas',default=[0.01,0.1,1], nargs='+',type=float)
     args = parser.parse_args()
     return args
 
@@ -215,6 +219,8 @@ if __name__ == "__main__":
     wSize = args.window
     superWindow= args.sw
     annot_path = args.annot
+    gammas = args.gammas
+    print(f'gammas is {gammas}')
     QMC = args.mc
     # read genotype data
     savepath = args.output
@@ -224,7 +230,8 @@ if __name__ == "__main__":
     bim = bfile+'.bim'
    
     gene_annot = pd.read_csv(annot_path,delimiter=' ')
-    G = read_plink1_bin(bed, bim, fam, verbose=False)
+    G = open_bed(bed)
+    # G = read_plink1_bin(bed, bim, fam, verbose=False)
     print('Finish lazy loading the genotype matrix')
 
     bimfile = pd.read_csv(bim,delim_whitespace=True,header=None)
@@ -266,13 +273,13 @@ if __name__ == "__main__":
     N = G.shape[0]
     AM = G.shape[1]
     results = []
-    gammas = [0.1,1,10] # to perform testing with multiple hyperparameter gamma, simply put the candidates here
+    
 
     # filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
     filename = args.filename 
     if args.thread == 1:
         count = 0
-        for rownum in range(0,gene_annot.shape[0]):
+        for rownum in tqdm(range(0,gene_annot.shape[0])):
             count += 1
             if rownum < gene_annot.shape[0]:
                 w = gene_annot.iloc[rownum]
