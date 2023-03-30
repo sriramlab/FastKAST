@@ -74,7 +74,7 @@ def score_test(S):
     dofs = np.ones(k)
     ncents = np.zeros(k)
     chi2s = [ChiSquared(S[i], ncents[i], dofs[i]) for i in range(k)]
-    p, error, info = chi2comb_cdf(0, chi2s, 0, lim = 1000000, atol=1e-20)
+    p, error, info = chi2comb_cdf(0, chi2s, 0, lim = 10000000, atol=1e-14)
     # p = qf.qf(0, Phi, acc = 1e-7)[0] 
     return (1-p,error)
 
@@ -88,7 +88,7 @@ def score_test2(sq_sigma_e0, Q, S, decompose=True,center=False):
     ncents = np.zeros(k)
     chi2s = [ChiSquared(Phi[i], ncents[i], dofs[i]) for i in range(k)]
     t0 = time.time()
-    p, error, info = chi2comb_cdf(Qe, chi2s, 0, lim= 1000000, atol=1e-20)
+    p, error, info = chi2comb_cdf(Qe, chi2s, 0, lim= 10000000, atol=1e-14)
     # p = qf.qf(0, Phi, acc = 1e-7)[0] 
     t1 = time.time()
     return (1-p,error)
@@ -232,7 +232,7 @@ def inverse_2(X):
 
 
 def inverse(X):
-    return pinvh(X.T@X)
+    return pinvh(X.T@X) #change from pinv to inv sep 6
     # return pinvh(X.T@X)
 
 def getfullComponent(X, Z, y, dtype = 'quant',center=False,method='Scipy'):
@@ -241,7 +241,11 @@ def getfullComponent(X, Z, y, dtype = 'quant',center=False,method='Scipy'):
     f1 = time.time()
     t0 = time.time()
     n = Z.shape[0]
-    X = np.concatenate((np.ones((n,1)),X),axis=1)
+    print(f'Z: {Z}')
+    if X.size > 1:
+        X = np.concatenate((np.ones((n,1)),X),axis=1)
+    else:
+        X = np.ones(n,1)
     y = y.reshape(-1,1)
     k = X.shape[1]
     yperm = np.random.permutation(y)
@@ -268,6 +272,7 @@ def getfullComponent(X, Z, y, dtype = 'quant',center=False,method='Scipy'):
         t1 = time.time()
         print(f'svd takes {t1-t0}')
         t0 = time.time()
+#        Q = np.sum(np.square(y.T@Z))
         Q = np.sum(np.square(y.T@Z - y.T@X@P1@X.T@Z))
         Q_perm = np.sum(np.square(yperm.T@Z - yperm.T@X@P1@X.T@Z)) 
         t1 = time.time()
@@ -281,6 +286,8 @@ def getfullComponent(X, Z, y, dtype = 'quant',center=False,method='Scipy'):
     S[S <= 1e-6] = 0
     S = S[np.nonzero(S)]
     S = S[~np.isnan(S)]
+    print(f'S: {S}')
+    print(f'Q: {Q}')
     ts1 = time.time()
     # k = int(np.sum(inner1d(P1,X)))
     t1 = time.time()
@@ -304,7 +311,7 @@ def getfullComponent(X, Z, y, dtype = 'quant',center=False,method='Scipy'):
 
 
 
-def getfullComponentPerm(X, Z, y, dtype = 'quant',center=True,method='Scipy',Perm=10, Test='nonlinear'):
+def getfullComponentPerm(X, Z, y, theta = False, dtype = 'quant',center=False,method='Scipy',Perm=10, Test='nonlinear'):
     # X is the covariates that need to be regressed out, res is the residule after regressing out the linear effect
     # delta is the initial guess of delta value
     print(f'use {method}')
@@ -317,7 +324,6 @@ def getfullComponentPerm(X, Z, y, dtype = 'quant',center=True,method='Scipy',Per
             X = np.concatenate((np.ones((n,1)),X),axis=1)
     else:
         X = np.concatenate((np.ones((n,1)),X),axis=1)
-    X = np.concatenate((np.ones((n,1)),X),axis=1)
     y = y.reshape(-1,1)
     k = X.shape[1]
     # yperm = np.random.permutation(y)
@@ -349,7 +355,7 @@ def getfullComponentPerm(X, Z, y, dtype = 'quant',center=True,method='Scipy',Per
 
             
         t1 = time.time()
-        print(f'svd takes {t1-t0}')
+        # print(f'svd takes {t1-t0}')
         t0 = time.time()
        
         
@@ -362,9 +368,10 @@ def getfullComponentPerm(X, Z, y, dtype = 'quant',center=True,method='Scipy',Per
 #     S = np.square(SVD[1])
     ts0 = time.time()
     S = np.square(S)
+    # print(f'S raw is {S}')
     S[S <= 1e-6] = 0
     S = S[np.nonzero(S)]
-    # S = S[~np.isnan(S)]
+    S = S[~np.isnan(S)]
     ts1 = time.time()
     # k = int(np.sum(inner1d(P1,X)))
     t1 = time.time()
@@ -376,7 +383,9 @@ def getfullComponentPerm(X, Z, y, dtype = 'quant',center=True,method='Scipy',Per
     else:
         sq_sigma_e0 = y.T@y/n
     # t0 = time.time()
+    # print(f'Y is {y}, {np.sum(y)}')
     p_value1 = score_test2(sq_sigma_e0, Q, S, center=center)
+    # print(f'Q is {Q}; sq_sigma_e0 is {sq_sigma_e0}; pval is {p_value1}')
     if Perm:
         p_list = [p_value1]
         for state in range(Perm):
@@ -386,6 +395,8 @@ def getfullComponentPerm(X, Z, y, dtype = 'quant',center=True,method='Scipy',Per
             sq_sigma_e0_perm = (yperm.T@yperm)[0]/(n-k)
             p_value1_perm = score_test2(sq_sigma_e0_perm, Qperm, S, center=center)
             p_list.append(p_value1_perm)
+        
+        # print(f'Finish permutation')
         # t1 = time.time()
         # print(f'p value test takes {t1-t0}')
         return p_list
@@ -498,7 +509,7 @@ def getRLComponent(X, Z, y, theta = False, dtype = 'quant',center=False,RL_SKAT=
         t0 = time.time()
         Z = projection(Z,X,P1)
         t1 = time.time()
-        print(f'Z operation takes {t1-t0}')
+        # print(f'Z operation takes {t1-t0}')
         if method == 'Jax':
             S = jax_svd(Z)
         elif method == 'Julia': 
@@ -517,7 +528,7 @@ def getRLComponent(X, Z, y, theta = False, dtype = 'quant',center=False,RL_SKAT=
         t1 = time.time()
         Q = (y.T@Z)@(Z.T@y)
         Q_perm =  (yperm.T@Z)@(Z.T@yperm)
-        print("svd takes {}".format(t1-t0))
+        # print("svd takes {}".format(t1-t0))
         Qe = Q/(sq_sigma_e0)
         Qe_perm = Q_perm/(sq_sigma_e0_perm)
         if RL_SKAT:
