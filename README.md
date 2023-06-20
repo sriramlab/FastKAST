@@ -47,7 +47,7 @@ p value = 2: p value calculation error
 ## Exmaple
 To run the demo code with a fixed window size, you can run
 ```
-python FastKAST.py --bfile ./example/sim --phen ./example/sim.pheno
+python FastKAST_annot.py --bfile ./example/sim --phen ./example/sim.pheno
 ```
 or directly run
 ```
