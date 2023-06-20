@@ -13,54 +13,70 @@ from sklearn.preprocessing import PolynomialFeatures
 from fastmle_res_jax import getfullComponent as getfullComponent1
 from fastmle_res_jax import getRLComponent as getfullComponent2
 from fastmle_res_jax import getfullComponentPerm
-from fastmle_res_jax import getmleComponent 
+from fastmle_res_jax import getmleComponent
 from sklearn.impute import SimpleImputer
 from utils import QMC_RFF
 
-def estimateSigmasGeneral(y, Xc, X, params=None, how='rand_mom',Random_state=1,method='Perm',Test='nonlinear'):
+
+def estimateSigmasGeneral(y,
+                          Xc,
+                          X,
+                          params=None,
+                          how='rand_mom',
+                          Random_state=1,
+                          method='Perm',
+                          Test='nonlinear'):
     np.random.seed(int.from_bytes(os.urandom(4), byteorder='little'))
 
-    
     if how == 'mle':
-        gamma = params['gamma'] if params['gamma'] is not None else (1/ (X.shape[1] * X.var()))
-        Kactual = pairwise_kernels(X, metric=params['kernel_metric'], gamma=gamma)
+        gamma = params['gamma'] if params['gamma'] is not None else (
+            1 / (X.shape[1] * X.var()))
+        Kactual = pairwise_kernels(X,
+                                   metric=params['kernel_metric'],
+                                   gamma=gamma)
         t0 = time.time()
-        center=params['center']
+        center = params['center']
         h = getmleComponent(Xc, Kactual, y, center=center)
         t1 = time.time()
-        Kernel_Time = t1-t0
+        Kernel_Time = t1 - t0
         states = [H[1] for H in h]
         pvals = [H[0] for H in h]
         print(f'mle pvals are: {pvals}')
         # print(f'get components takes {t1-t0}')
-        return (pvals,Kernel_Time,states)
- 
+        return (pvals, Kernel_Time, states)
+
     elif how == 'fast_mle':
-        gamma = params['gamma'] if params['gamma'] is not None else (1/ (X.shape[1]*X.var()))
+        gamma = params['gamma'] if params['gamma'] is not None else (
+            1 / (X.shape[1] * X.var()))
         # print( gamma)
         t0 = time.time()
-        center=params['center']
+        center = params['center']
         # if params['version'] == 1:
         #     rbfs = RBFSampler(gamma=gamma, n_components=params['D'],random_state=Random_state)
         #     Z = rbfs.fit_transform(X)
         # elif params['version'] == 2:
         #     Z = RFF_fit_transform(X,params['D'],gamma,seed=Random_state)
-        QMC=params['version']
+        QMC = params['version']
         # print(QMC)
         # t0 = time.time()
-        if QMC=='Vanilla':
-            rbfs = RBFSampler(gamma=gamma, n_components=params['D'],random_state=Random_state)
+        if QMC == 'Vanilla':
+            rbfs = RBFSampler(gamma=gamma,
+                              n_components=params['D'],
+                              random_state=Random_state)
             Z = rbfs.fit_transform(X)
         else:
-            Z = QMC_RFF(gamma=gamma,d=X.shape[1],n_components=params['D'],seed=Random_state,QMC=QMC).fit_transform(X)
-        
-        print(f'Test version is {Test}')   
+            Z = QMC_RFF(gamma=gamma,
+                        d=X.shape[1],
+                        n_components=params['D'],
+                        seed=Random_state,
+                        QMC=QMC).fit_transform(X)
+
+        print(f'Test version is {Test}')
         # if Test=='general': #commented out in Sep 4th
         #     Z = np.concatenate((X,Z),axis=1)
         # t1 = time.time()
         # print(f'Halton constructin takes {t1-t0}')
 
-            
         t1 = time.time()
         # print('Z takes {}'.format(t1-t0))
         n = X.shape[0]
@@ -68,75 +84,85 @@ def estimateSigmasGeneral(y, Xc, X, params=None, how='rand_mom',Random_state=1,m
         del X
         t1 = time.time()
         # print(f'delete X takes {t1-t0}')
-        if method=='all':
+        if method == 'all':
             t0 = time.time()
             h = getfullComponent1(Xc, Z, y, center=center)
             t1 = time.time()
-            SKAT_time = t1-t0
+            SKAT_time = t1 - t0
             # print(f'SKAT takes {t1-t0}')
             t0 = time.time()
-            h2 = getfullComponent2(Xc, Z, y, center=center, RL_SKAT=True) 
+            h2 = getfullComponent2(Xc, Z, y, center=center, RL_SKAT=True)
             t1 = time.time()
-            RL_SKAT_time = t1-t0
+            RL_SKAT_time = t1 - t0
             # print(f'RL_SKAT takes {t1-t0}')
-            return (([H[0] for H in h],SKAT_time,[H[1] for H in h]),([H[0] for H in h2],RL_SKAT_time,[H[1] for H in h]))
-        elif method=='SKAT':
+            return (([H[0] for H in h], SKAT_time, [H[1] for H in h]),
+                    ([H[0] for H in h2], RL_SKAT_time, [H[1] for H in h]))
+        elif method == 'SKAT':
             t0 = time.time()
             h = getfullComponent1(Xc, Z, y, center=center)
             t1 = time.time()
-            SKAT_time = t1-t0
+            SKAT_time = t1 - t0
             states = [H[1] for H in h]
             pvals = [H[0] for H in h]
             # print(f'SKAT takes {t1-t0}')
-            return (pvals,SKAT_time,states)
-        elif method=='Perm':
+            return (pvals, SKAT_time, states)
+        elif method == 'Perm':
             t0 = time.time()
-            h = getfullComponentPerm(Xc, Z, y, center=center, Test=Test, Perm=100)
+            h = getfullComponentPerm(Xc,
+                                     Z,
+                                     y,
+                                     center=center,
+                                     Test=Test,
+                                     Perm=100)
             states = [H[1] for H in h]
             pvals = [H[0] for H in h]
             t1 = time.time()
-            SKAT_time = t1-t0
+            SKAT_time = t1 - t0
             # print(f'SKAT Perm takes {t1-t0}')
-            return (pvals,SKAT_time,states)
+            return (pvals, SKAT_time, states)
 
-        elif method=='CCT' or method=='vary':
+        elif method == 'CCT' or method == 'vary':
             t0 = time.time()
-            h = getfullComponentPerm(Xc, Z, y, center=center,Perm=1,method='Scipy')
+            h = getfullComponentPerm(Xc,
+                                     Z,
+                                     y,
+                                     center=center,
+                                     Perm=1,
+                                     method='Scipy')
             states = [H[1] for H in h]
             pvals = [H[0] for H in h]
             t1 = time.time()
-            SKAT_time = t1-t0
+            SKAT_time = t1 - t0
             # print(f'SKAT Perm takes {t1-t0}')
-            return (pvals,SKAT_time,states)	
+            return (pvals, SKAT_time, states)
 
-        elif method=='RL_SKAT':
+        elif method == 'RL_SKAT':
             t0 = time.time()
-            h2 = getfullComponent2(Xc, Z, y, center=center, RL_SKAT=True) 
+            h2 = getfullComponent2(Xc, Z, y, center=center, RL_SKAT=True)
             t1 = time.time()
-            RL_SKAT_time = t1-t0
+            RL_SKAT_time = t1 - t0
             # print(f'RL_SKAT takes {t1-t0}')
-            return (h2,RL_SKAT_time)
+            return (h2, RL_SKAT_time)
         else:
             print(f'no method named {method}')
             return []
 
-        
-
     elif how == 'fast_lin':
         print(f'Compute linear effect (SKAT)')
-        center=params['center']
-        Z = (X)/np.sqrt(X.shape[1]) 
+        center = params['center']
+        Z = (X) / np.sqrt(X.shape[1])
         print(f'Z shape is {Z.shape}, Xc shape is {Xc.shape}')
         h = getfullComponent1(Xc, Z, y, center=center)
         return h
 
     elif how == 'quad':
-        center=params['center']
+        center = params['center']
         poly = PolynomialFeatures(2)
         Z = poly.fit_transform(X)
-        Z = (Z)/np.sqrt(Z.shape[1]) 
+        Z = (Z) / np.sqrt(Z.shape[1])
         h = getfullComponent1(Xc, Z, y, center=center)
         return h
+
 
 def impute_def(x):
     col_mean = np.nanmean(x, axis=0)
@@ -144,7 +170,8 @@ def impute_def(x):
     x[inds] = np.take(col_mean, inds[1])
     return x
 
+
 def impute(x):
-    imp = SimpleImputer(missing_values=np.nan,strategy='mean')
+    imp = SimpleImputer(missing_values=np.nan, strategy='mean')
     x = imp.fit_transform(x)
     return x

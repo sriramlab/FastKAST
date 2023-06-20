@@ -8,4 +8,4 @@ python ./FastKAST_annot.py \
 --bfile ${gen} --phen ${phe} --mc Vanilla  --map 50 \
 --annot ./example/sim.annot --output ./sim_results/ \
 --gammas 0.1  \
---HP Perm --sw 2 --filename sim_M_50_known_kernel_100_beta.pkl
+--HP Perm --sw 2 --filename sim_M_50_known_kernel_100_beta
