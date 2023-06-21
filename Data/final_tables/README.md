@@ -5,5 +5,5 @@
 `pc.table.csv`: Robustness of FastKAST w.r.t population structure (vary PCs)\
 `gene_epistasis.csv`: FastKAST epistasis only gene test\
 `fixed_window.csv`: FastKAST epistasis only fix window test\
-`FastKAST.sig.all.csv`: FastKAST general test candidate regions (across five different seeds)\
+`FastKAST.sig.all.csv`: FastKAST general test candidate regions (across five different seeds)
 
