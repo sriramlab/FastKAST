@@ -21,8 +21,8 @@ from numpy.core.umath_tests import inner1d
 def scipy_svd(X):
     return scipy.linalg.svd(X, full_matrices=False, compute_uv=False)
 
-def numpy_svd(X):
-    return np.linalg.svd(X,full_matrices=False, compute_uv=False)
+def numpy_svd(X,compute_uv=False):
+    return np.linalg.svd(X,full_matrices=False, compute_uv=compute_uv)
 
 def lik2(param, *args):
     if len(args) == 1:
@@ -122,50 +122,35 @@ def dlik(logdelta, *args):
     return der
 
 
-def VarComponentEst(Z, y, theta=False, dtype='quant'):
+def VarComponentEst(S, U, y, theta=False, dtype='quant',center=True):
     # delta is the initial guess of delta value
-    f1 = time.time()
-    t0 = time.time()
-    n = Z.shape[0]
-    try:
-        SVD = svd(Z, full_matrices=False)
-    except:
-        print('SVD doesn not converge')
-        return []
-    t1 = time.time()
-    print("svd takes {}".format(t1 - t0))
-    S = SVD[1]
-    S = np.square(SVD[1])
-    S[np.abs(S) < 1e-6] = 0
-    S = S[np.nonzero(S)]
-    U = SVD[0][:, 0:len(S)]
-    UTy = U.T @ y.T  # O(ND)
+    n = y.shape[0]
+    UTy = U.T @ y  # O(ND)
     if n > len(S):
-        LLadd1 = sum(np.square(y.T - U @ UTy))
+        LLadd1 = np.sum(np.square(y - U @ UTy))
     else:
         LLadd1 = None
     # optimizer = brent(lik, args=(n, S, UTy, LLadd1), brack = (-10, 10))
     t0 = time.time()
-    #        optimizer = (minimize(lik, [0], args=(n, S, UTy, LLadd1), method = 'Nelder-Mead', options={'maxiter':400}))
-    optimizer = (minimize(lik, [0],
-                          args=(n, S, UTy, LLadd1),
-                          method='L-BFGS-B',
-                          jac=dlik,
-                          options={
-                              'maxcor': 15,
-                              'ftol': 1e-10,
-                              'gtol': 1e-9,
-                              'maxfun': 30000,
-                              'maxiter': 30000,
-                              'maxls': 30
-                          }))
+    optimizer = (minimize(lik, [0], args=(n, S, UTy, LLadd1), method = 'Nelder-Mead', options={'maxiter':400}))
+    # optimizer = (minimize(lik, [0],
+    #                       args=(n, S, UTy, LLadd1),
+    #                       method='L-BFGS-B',
+    #                       jac=dlik,
+    #                       options={
+    #                           'maxcor': 15,
+    #                           'ftol': 1e-10,
+    #                           'gtol': 1e-9,
+    #                           'maxfun': 30000,
+    #                           'maxiter': 30000,
+    #                           'maxls': 30
+    #                       }))
     logdelta = optimizer.x[0]
     t1 = time.time()
     # print(f'optimization takes {t1-t0}')
     # logdelta = optimizer
     # fun = -1*lik(logdelta, n, S, UTy, LLadd1)
     fun = -1 * optimizer.fun
-    # print(f'success: {optimizer.success}')
 
     delta = np.exp(logdelta)
     h = 1 / (delta + 1)  # heritability
@@ -174,14 +159,15 @@ def VarComponentEst(Z, y, theta=False, dtype='quant'):
     else:
         sq_sigma_g = (sum(np.square(UTy.flatten()) /
                           (S + delta)) + LLadd1 / delta) / n
+
     sq_sigma_e = delta * sq_sigma_g
     time0 = time.time()
-    gerr, eerr = standerr(U, y.T, S, UTy, sq_sigma_g, sq_sigma_e)
+    gerr, eerr = standerr(U, y, S, UTy, sq_sigma_g, sq_sigma_e)
     time1 = time.time()
     # print('error bound time is {}'.format(time1-time0))
 
     L1 = -lik(logdelta, n, S, UTy, LLadd1) - 0.5 * n * np.log(np.pi) - 0.5 * n
-    yTy = (y @ y.T)[0]
+    yTy = (y.T @ y)[0]
     if dtype == 'quant':
         sq_sigma_e0 = yTy / n
     else:
@@ -192,16 +178,8 @@ def VarComponentEst(Z, y, theta=False, dtype='quant'):
 #    sq_sigma_e0 = sq_sigma_e
     L0 = -0.5 * (n * np.log(np.pi) + n * np.log(sq_sigma_e0) +
                  yTy / sq_sigma_e0)
-
-    # p_value2 = 1 - chi2.cdf(-2*(L0 - L1), 1)
-    t0 = time.time()
-    p_value1 = score_test(sq_sigma_e0, Z, y, S)
-    t1 = time.time()
-    print(f'p value test takes {t1-t0}')
-    print(f'p value is {p_value1}')
-    # print('e is {}'.format(sq_sigma_e0))
     return [
-        h, sq_sigma_g, sq_sigma_e, fun, p_value1, -2 * (L0 - L1), gerr, eerr
+        h, sq_sigma_g, sq_sigma_e, gerr, eerr
     ]
 
 
@@ -315,17 +293,15 @@ def getfullComponentPerm(X,
                          center=False,
                          method='Numpy',
                          Perm=10,
-                         Test='nonlinear'):
+                         Test='nonlinear',
+                         VarCompEst=False):
     # X is the covariates that need to be regressed out, res is the residule after regressing out the linear effect
     # delta is the initial guess of delta value
-    print(f'use {method}')
     t0 = time.time()
     n = Z.shape[0]
-    if Test == 'general':
-        if X.size == 0:
-            X = np.ones(n, 1)
-        else:
-            X = np.concatenate((np.ones((n, 1)), X), axis=1)
+
+    if X is None:
+        X = np.ones((n, 1))
     else:
         X = np.concatenate((np.ones((n, 1)), X), axis=1)
     y = y.reshape(-1, 1)
@@ -335,37 +311,47 @@ def getfullComponentPerm(X,
     start = time.time()
     t1 = time.time()
     # print(f'inverse P1 takes {t1-t0}')
-    if center:
-        # S = svd(Z.T@Z-(Z.T@P1)@(X.T@Z),compute_uv=False)
-        t0 = time.time()
-        # Z = left_projection(Z,X)
-        # Z = projection_QR(Z,X,P1)
-        Z = projection(Z, X, P1)
-        # Z = Z - X@P1@(X.T@Z)
-        t1 = time.time()
-        # print(f'Z operation takes {t1-t0}')
-        S = numpy_svd(Z)
-        # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
-
-        Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z))
-
-        t1 = time.time()
-        # print(f'svd takes {t1-t0}')
-        t0 = time.time()
-
-        # Q_perm = np.sum(np.square(yperm.T@Z - yperm.T@X@P1@X.T@Z))
-        t1 = time.time()
+    # S = svd(Z.T@Z-(Z.T@P1)@(X.T@Z),compute_uv=False)
+    t0 = time.time()
+    # Z = left_projection(Z,X)
+    # Z = projection_QR(Z,X,P1)
+    Z = projection(Z, X, P1)
+    # Z = Z - X@P1@(X.T@Z)
+    t1 = time.time()
+    # print(f'Z operation takes {t1-t0}')
+    if VarCompEst:
+        U,S,_ = numpy_svd(Z,compute_uv=True)
     else:
-        SVD = svd(Z.T @ Z)
-        Q = np.sum(np.square(y.T @ Z))
+        S = numpy_svd(Z)
+    # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
+
+    Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z))
+
+    t1 = time.time()
+    # print(f'svd takes {t1-t0}')
+    t0 = time.time()
+
+    # Q_perm = np.sum(np.square(yperm.T@Z - yperm.T@X@P1@X.T@Z))
+    t1 = time.time()
+    S = np.square(S)
+    S[S <= 1e-6] = 0
+    filtered=np.nonzero(S)[0]
+    S = S[filtered]
+
+    results = {}
+    if VarCompEst:
+        print(U.shape)
+        U = U[:,filtered]
+        print(U.shape,S.shape)
+        var_est=VarComponentEst(S,U,y)
+        results['varcomp']=var_est
+        print(f'Var est is: \n {var_est}')
     t0 = time.time()
     #     S = np.square(SVD[1])
     ts0 = time.time()
-    S = np.square(S)
+    
     # print(f'S raw is {S}')
-    S[S <= 1e-6] = 0
-    S = S[np.nonzero(S)]
-    S = S[~np.isnan(S)]
+    
     ts1 = time.time()
     # k = int(np.sum(inner1d(P1,X)))
     t1 = time.time()
@@ -378,6 +364,7 @@ def getfullComponentPerm(X,
         sq_sigma_e0 = y.T @ y / n
     # t0 = time.time()
     # print(f'Y is {y}, {np.sum(y)}')
+    
     p_value1 = score_test2(sq_sigma_e0, Q, S, center=center)
     # print(f'Q is {Q}; sq_sigma_e0 is {sq_sigma_e0}; pval is {p_value1}')
     if Perm:
@@ -393,12 +380,10 @@ def getfullComponentPerm(X,
                                         center=center)
             p_list.append(p_value1_perm)
 
-        # print(f'Finish permutation')
-        # t1 = time.time()
-        # print(f'p value test takes {t1-t0}')
-        return p_list
-
-    return p_value1
+        results['pval']=p_list
+        return results
+    results['pval']=p_value1
+    return results
 
 
 ##########
@@ -649,7 +634,7 @@ if __name__ == "__main__":
     np.random.seed(1)
     from sklearn import preprocessing
     print(f'Simulating linear effect with h2 = 0.5')
-    for sigma1sq, sigma2sq in [(0, 0.5)]:
+    for sigma1sq, sigma2sq in [(0.1, 0.9)]:
         N = 5000
         M = 10
         D = M * 50
@@ -660,15 +645,17 @@ if __name__ == "__main__":
         for i in range(200):
             Z = rbfs.fit_transform(X)
             eps = np.random.randn(N) * np.sqrt(sigma2sq)
-            beta = np.random.randn(X.shape[1]) * np.sqrt(sigma1sq / M)
-            y = X.dot(beta) + eps
-            plist = getfullComponent(X,
-                                     Z,
-                                     y,
-                                     dtype=dtype,
-                                     center=True,
-                                     method="Julia")
-            print(f'FastKAST p value is {plist[0][0]}')
-            results.append((plist, sigma1sq / (sigma1sq + sigma2sq), N, M, D))
+            beta = np.random.randn(Z.shape[1]) * np.sqrt(sigma1sq)
+            y = Z.dot(beta) + eps
+            # plist = getfullComponent(X,
+            #                          Z,
+            #                          y,
+            #                          dtype=dtype,
+            #                          center=True,
+            #                          method="Julia")
+            # print(f'FastKAST p value is {plist[0][0]}')
+            results = getfullComponentPerm(None,Z,y.reshape(1,-1),VarCompEst=True)
+            # print(results)
+            # results.append((plist, sigma1sq / (sigma1sq + sigma2sq), N, M, D))
 
-    dump(results, f'./test.pkl')
+    # dump(results, f'./test.pkl')
