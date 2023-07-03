@@ -277,6 +277,8 @@ def parseargs():  # handle user arguments
                         default=[0.01, 0.1, 1],
                         nargs='+',
                         type=float)
+    parser.add_argument('--tindex',type=int)
+    parser.add_argument('--CR',type=int)
     args = parser.parse_args()
     return args
 
@@ -300,6 +302,8 @@ if __name__ == "__main__":
     fam = bfile + '.fam'
     bim = bfile + '.bim'
 
+    tindex = args.tindex-1 # task index indicating which region to analyze
+    CR = args.CR # how many windows does the current taks test
 
     bimfile = pd.read_csv(bim, delim_whitespace=True, header=None)
     bimfile.columns = ['chr', 'chrpos', 'MAF', 'pos', 'MAJ', 'MIN']
@@ -318,6 +322,8 @@ if __name__ == "__main__":
         print(gene_annot)
     else:
         gene_annot = pd.read_csv(annot_path, delimiter=' ')
+
+    gene_annot_sel = gene_annot.iloc[CR*tindex:CR*(tindex+1)].reset_index(drop=True) # working on the current range of the annotation
     G = open_bed(bed)
     # G = read_plink1_bin(bed, bim, fam, verbose=False)
     print('Finish lazy loading the genotype matrix')
