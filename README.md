@@ -28,8 +28,16 @@ FastKAST receives the inpute genotype and phenotype, output p value.
  *     Number of thread to be use (default is 1)
  * sw: int
  *     Number of neighboring window included to totally regress out linear effect (default is 2)
- * dir: output directory
- * output: output file name
+ * annot: file
+ *     Annotation file
+ * filename: string
+ *     Output file name
+ * test: string
+ *     Type of kernel test to use
+ * kernel: string
+ *     Which kernel to use
+ * gammas: list
+ *     Values of gamma to test with kernel
 * Output: a list of list with the following information(pkl file)
  * pval: best p-value at each set
  * p_perm: 10 permuted p-value at each set (useful to learn the distribution when testing multiple hyperparameters)
