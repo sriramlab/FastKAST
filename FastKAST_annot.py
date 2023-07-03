@@ -165,7 +165,7 @@ def paraCompute(args):
     t0 = time.time()
     for gamma in gammas:
         params = dict(gamma=gamma,
-                      kernel_metric='rbf',
+                      kernel_metric=kernel,
                       D=D,
                       center=True,
                       hutReps=250,
@@ -273,6 +273,10 @@ def parseargs():  # handle user arguments
                         default='nonlinear',
                         choices=['nonlinear', 'higher', 'general'],
                         help='What type of kernel to test')
+    parser.add_argument('--kernel',
+                        default='rbf',
+                        choices=['rbf', 'polynomial'],
+                        help='Which kernel to use')
     parser.add_argument('--gammas',
                         default=[0.01, 0.1, 1],
                         nargs='+',
@@ -284,6 +288,7 @@ def parseargs():  # handle user arguments
 if __name__ == "__main__":
     args = parseargs()
     Test = args.test
+    kernel = args.kernel
     HP = args.HP
     # set parameters
     Map_Dim = args.map

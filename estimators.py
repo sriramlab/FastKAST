@@ -8,6 +8,7 @@ from sklearn.metrics.pairwise import pairwise_kernels
 # from sklearn.metrics.pairwise import additive_chi2_kernel
 # from sklearn.kernel_approximation import AdditiveChi2Sampler
 from sklearn.kernel_approximation import RBFSampler
+from sklearn.kernel_approximation import PolynomialCountSketch
 from sklearn import preprocessing
 from sklearn.preprocessing import PolynomialFeatures
 from fastmle_res_jax import getfullComponent as getfullComponent1
@@ -33,7 +34,9 @@ def estimateSigmasGeneral(y,
             1 / (X.shape[1] * X.var()))
         Kactual = pairwise_kernels(X,
                                    metric=params['kernel_metric'],
-                                   gamma=gamma)
+                                   gamma=gamma,
+                                   degree=2,
+                                   coef0=0)
         t0 = time.time()
         center = params['center']
         h = getmleComponent(Xc, Kactual, y, center=center)
@@ -63,7 +66,15 @@ def estimateSigmasGeneral(y,
             rbfs = RBFSampler(gamma=gamma,
                               n_components=params['D'],
                               random_state=Random_state)
-            Z = rbfs.fit_transform(X)
+            ps = PolynomialCountSketch(degree=2, 
+                                       coef0=0, 
+                                       gamma=gamma, 
+                                       n_components=params['D'], 
+                                       random_state=Random_state)
+            if params['kernel_metric'] == 'rbf':
+                Z = rbfs.fit_transform(X)
+            else:
+                Z = ps.fit_transform(X)
         else:
             Z = QMC_RFF(gamma=gamma,
                         d=X.shape[1],
