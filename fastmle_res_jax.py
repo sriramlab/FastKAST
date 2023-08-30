@@ -9,10 +9,12 @@ import time
 from numpy.linalg import inv
 import scipy
 from scipy.linalg import pinvh
+import fastlmmclib.quadform as qf
 from chi2comb import chi2comb_cdf, ChiSquared
 from sklearn.linear_model import LogisticRegression
 import scipy
 from numpy.core.umath_tests import inner1d
+from sklearn.preprocessing import PolynomialFeatures
 
 # def jax_svd(X):
 #     return svd(X, full_matrices = False, compute_uv=False).block_until_ready()
@@ -69,10 +71,16 @@ def score_test2(sq_sigma_e0, Q, S, decompose=True, center=False):
     ncents = np.zeros(k)
     chi2s = [ChiSquared(Phi[i], ncents[i], dofs[i]) for i in range(k)]
     t0 = time.time()
-    p, error, info = chi2comb_cdf(Qe, chi2s, 0, lim=10000000, atol=1e-14)
+    p, error, info = chi2comb_cdf(Qe, chi2s, 0, lim=int(1e6), atol=1e-50)
     # p = qf.qf(0, Phi, acc = 1e-7)[0]
     t1 = time.time()
     return (1 - p, error)
+
+def score_test_qf(sq_sigma_e0, Q, S, decompose=True, center=False):
+    Qe = float(Q / (sq_sigma_e0))
+    stats=qf.qf(Qe, S,sigma=1,lim=int(1e6),acc = 1e-50)
+    p = stats[0]
+    return (p)
 
 
 def lik(logdelta, *args):
@@ -299,6 +307,7 @@ def getfullComponentPerm(X,
     # delta is the initial guess of delta value
     t0 = time.time()
     n = Z.shape[0]
+    M = Z.shape[1]
 
     if X is None:
         X = np.ones((n, 1))
@@ -344,6 +353,16 @@ def getfullComponentPerm(X,
         U = U[:,filtered]
         print(U.shape,S.shape)
         var_est=VarComponentEst(S,U,y)
+        sigma2_gxg=var_est[1]
+        sigma2_e=var_est[2]
+        trace=np.sum(S) # compute the trace of phi phi.T
+        sumK = np.sum(np.sum(Z,axis=0)**2) # compute the sum(Phi Phi.T)
+        print(f'trace is {trace}; sum K is {sumK}')
+
+        cC=trace*1.0/(n*M) - sumK*1.0/(n**2*M)
+        print(f'Constant factor is {cC}')
+        h2_gxg=cC*sigma2_gxg/(cC*sigma2_gxg+((n-1)*1.0/n)*sigma2_e)
+        print(f'Before correction: {sigma2_gxg}; after correction: {h2_gxg}')
         results['varcomp']=var_est
         print(f'Var est is: \n {var_est}')
     t0 = time.time()
@@ -366,6 +385,8 @@ def getfullComponentPerm(X,
     # print(f'Y is {y}, {np.sum(y)}')
     
     p_value1 = score_test2(sq_sigma_e0, Q, S, center=center)
+    p_values2 = score_test_qf(sq_sigma_e0, Q, S, center=center)
+    print(f'chi2comb pval: {p_value1} \n FastLMM pval: {p_values2}')
     # print(f'Q is {Q}; sq_sigma_e0 is {sq_sigma_e0}; pval is {p_value1}')
     if Perm:
         p_list = [p_value1]
@@ -633,19 +654,23 @@ if __name__ == "__main__":
     dtype = 'quant'
     np.random.seed(1)
     from sklearn import preprocessing
+    from sklearn.kernel_approximation import PolynomialCountSketch
     print(f'Simulating linear effect with h2 = 0.5')
-    for sigma1sq, sigma2sq in [(0.1, 0.9)]:
+    for sigma1sq, sigma2sq in [(0.01, 0.99)]:
         N = 5000
         M = 10
         D = M * 50
         gamma = 0.1
         X = np.random.binomial(2, np.random.uniform(0.3, 0.7, M), (N, M))
-        X = preprocessing.scale(X)
-        rbfs = RBFSampler(gamma=gamma, n_components=D)
+        
+
+        mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
         for i in range(200):
-            Z = rbfs.fit_transform(X)
+            Z = mapping.fit_transform(X)
+            Z = preprocessing.scale(Z)
+            print(f'Z shape is {Z.shape}')
             eps = np.random.randn(N) * np.sqrt(sigma2sq)
-            beta = np.random.randn(Z.shape[1]) * np.sqrt(sigma1sq)
+            beta = np.random.randn(Z.shape[1]) * np.sqrt(sigma1sq)*1.0
             y = Z.dot(beta) + eps
             # plist = getfullComponent(X,
             #                          Z,
