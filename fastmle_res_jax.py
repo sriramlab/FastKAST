@@ -298,7 +298,7 @@ def getfullComponentPerm(X,
                          y,
                          theta=False,
                          dtype='quant',
-                         center=False,
+                         center=True,
                          method='Numpy',
                          Perm=10,
                          Test='nonlinear',
@@ -385,8 +385,8 @@ def getfullComponentPerm(X,
     # print(f'Y is {y}, {np.sum(y)}')
     
     p_value1 = score_test2(sq_sigma_e0, Q, S, center=center)
-    p_values2 = score_test_qf(sq_sigma_e0, Q, S, center=center)
-    print(f'chi2comb pval: {p_value1} \n FastLMM pval: {p_values2}')
+#     p_values2 = score_test_qf(sq_sigma_e0, Q, S, center=center)
+#     print(f'chi2comb pval: {p_value1} \n FastLMM pval: {p_values2}')
     # print(f'Q is {Q}; sq_sigma_e0 is {sq_sigma_e0}; pval is {p_value1}')
     if Perm:
         p_list = [p_value1]
