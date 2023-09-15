@@ -20,8 +20,8 @@ from sklearn.preprocessing import PolynomialFeatures
 #     return svd(X, full_matrices = False, compute_uv=False).block_until_ready()
 
 
-def scipy_svd(X):
-    return scipy.linalg.svd(X, full_matrices=False, compute_uv=False)
+def scipy_svd(X,compute_uv=False):
+    return scipy.linalg.svd(X, full_matrices=False, compute_uv=compute_uv)
 
 def numpy_svd(X,compute_uv=False):
     return np.linalg.svd(X,full_matrices=False, compute_uv=compute_uv)
@@ -71,14 +71,14 @@ def score_test2(sq_sigma_e0, Q, S, decompose=True, center=False):
     ncents = np.zeros(k)
     chi2s = [ChiSquared(Phi[i], ncents[i], dofs[i]) for i in range(k)]
     t0 = time.time()
-    p, error, info = chi2comb_cdf(Qe, chi2s, 0, lim=int(1e6), atol=1e-50)
+    p, error, info = chi2comb_cdf(Qe, chi2s, 0, lim=int(1e9), atol=1e-13)
     # p = qf.qf(0, Phi, acc = 1e-7)[0]
     t1 = time.time()
     return (1 - p, error)
 
 def score_test_qf(sq_sigma_e0, Q, S, decompose=True, center=False):
     Qe = float(Q / (sq_sigma_e0))
-    stats=qf.qf(Qe, S,sigma=1,lim=int(1e6),acc = 1e-50)
+    stats=qf.qf(Qe, S,sigma=1,lim=int(1e8),acc = 1e-15)
     p = stats[0]
     return (p)
 
@@ -108,6 +108,16 @@ def standerr(U, y, Sii, UTy, g, e):
         np.square(UTy).flatten() / ((e + Sii * g)**3))
     L12 = np.sum((np.square(UTy.flatten()) * Sii) / (g * Sii + e)**3)
     L = 0.5 * np.array([[L11, L12], [L12, L22]])
+    cov = np.linalg.inv(L)
+    gerr = np.sqrt(cov[0][0])
+    eerr = np.sqrt(cov[1][1])
+    return [gerr, eerr]
+
+def standerr_dev(U, y, Sii, UTy, g, e):
+    L11 = 0.5*np.sum(np.square(Sii) / (g * Sii + e)**2)-np.sum(np.square(UTy.flatten()) * np.square(Sii) / (g * Sii + e)**3)
+    L22 = 0.5*np.sum(1. / (g * Sii + e)**2) - np.sum(np.square(UTy.flatten()) / (g * Sii + e)**3)
+    L12 = 0.5*np.sum(Sii/(g * Sii + e)**2)-np.sum((np.square(UTy.flatten()) * Sii) / (g * Sii + e)**3)
+    L = np.array([[L11, L12], [L12, L22]])
     cov = np.linalg.inv(L)
     gerr = np.sqrt(cov[0][0])
     eerr = np.sqrt(cov[1][1])
@@ -170,7 +180,7 @@ def VarComponentEst(S, U, y, theta=False, dtype='quant',center=True):
 
     sq_sigma_e = delta * sq_sigma_g
     time0 = time.time()
-    gerr, eerr = standerr(U, y, S, UTy, sq_sigma_g, sq_sigma_e)
+    gerr, eerr = standerr_dev(U, y, S, UTy, sq_sigma_g, sq_sigma_e)
     time1 = time.time()
     # print('error bound time is {}'.format(time1-time0))
 
@@ -332,6 +342,7 @@ def getfullComponentPerm(X,
         U,S,_ = numpy_svd(Z,compute_uv=True)
     else:
         S = numpy_svd(Z)
+    print(S)
     # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
 
     Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z))
