@@ -114,11 +114,21 @@ def standerr(U, y, Sii, UTy, g, e):
     return [gerr, eerr]
 
 def standerr_dev(U, y, Sii, UTy, g, e):
-    L11 = 0.5*np.sum(np.square(Sii) / (g * Sii + e)**2)-np.sum(np.square(UTy.flatten()) * np.square(Sii) / (g * Sii + e)**3)
-    L22 = 0.5*np.sum(1. / (g * Sii + e)**2) - np.sum(np.square(UTy.flatten()) / (g * Sii + e)**3)
-    L12 = 0.5*np.sum(Sii/(g * Sii + e)**2)-np.sum((np.square(UTy.flatten()) * Sii) / (g * Sii + e)**3)
+    print(g,e)
+    n = len(y)
+    nulity = max(0, n - len(Sii))
+    L11 = -0.5*(np.sum(np.square(Sii) / (g * Sii + e)**2))+np.sum(np.square(UTy.flatten()) * np.square(Sii) / (g * Sii + e)**3) 
+    L22 = -0.5*(np.sum(1. / (g * Sii + e)**2)+nulity*1./e**2) + np.sum(np.square(UTy.flatten()) / (g * Sii + e)**3) +  np.sum(np.square((y - U @ UTy).flatten()) / e**3)
+    # print((np.square(UTy.flatten())).shape)
+    # print(((g * Sii + e)**3).shape)
+    # print(f'L22 is {L22}')
+    L12 = -0.5*np.sum(Sii/np.square(g * Sii + e))+np.sum(np.square(UTy.flatten()) * Sii / (g * Sii + e)**3)
+    # print(np.sum(np.square(UTy.flatten()) * Sii / (g * Sii + e)**3))
+    # print(-0.5*np.sum(Sii/(g * Sii + e)**2))
     L = np.array([[L11, L12], [L12, L22]])
+    # print(L)
     cov = np.linalg.inv(L)
+    # print(cov)
     gerr = np.sqrt(cov[0][0])
     eerr = np.sqrt(cov[1][1])
     return [gerr, eerr]
@@ -342,7 +352,7 @@ def getfullComponentPerm(X,
         U,S,_ = numpy_svd(Z,compute_uv=True)
     else:
         S = numpy_svd(Z)
-    print(S)
+    # print(S)
     # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
 
     Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z))
@@ -396,6 +406,7 @@ def getfullComponentPerm(X,
     # print(f'Y is {y}, {np.sum(y)}')
     
     p_value1 = score_test2(sq_sigma_e0, Q, S, center=center)
+    print(f'pval is {p_value1}')
 #     p_values2 = score_test_qf(sq_sigma_e0, Q, S, center=center)
 #     print(f'chi2comb pval: {p_value1} \n FastLMM pval: {p_values2}')
     # print(f'Q is {Q}; sq_sigma_e0 is {sq_sigma_e0}; pval is {p_value1}')
@@ -676,12 +687,12 @@ if __name__ == "__main__":
         
 
         mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
-        for i in range(200):
+        for i in range(1):
             Z = mapping.fit_transform(X)
             Z = preprocessing.scale(Z)
             print(f'Z shape is {Z.shape}')
             eps = np.random.randn(N) * np.sqrt(sigma2sq)
-            beta = np.random.randn(Z.shape[1]) * np.sqrt(sigma1sq)*1.0
+            beta = np.random.randn(Z.shape[1]) * np.sqrt(sigma1sq)*1.0/np.sqrt(Z.shape[1])
             y = Z.dot(beta) + eps
             # plist = getfullComponent(X,
             #                          Z,
@@ -690,7 +701,7 @@ if __name__ == "__main__":
             #                          center=True,
             #                          method="Julia")
             # print(f'FastKAST p value is {plist[0][0]}')
-            results = getfullComponentPerm(None,Z,y.reshape(1,-1),VarCompEst=True)
+            results = getfullComponentPerm(None,Z*1.0/np.sqrt(Z.shape[1]),y.reshape(1,-1),VarCompEst=True)
             # print(results)
             # results.append((plist, sigma1sq / (sigma1sq + sigma2sq), N, M, D))
 
