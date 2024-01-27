@@ -23,8 +23,8 @@ from sklearn.preprocessing import PolynomialFeatures
 def scipy_svd(X,compute_uv=False):
     return scipy.linalg.svd(X, full_matrices=False, compute_uv=compute_uv)
 
-def numpy_svd(X,compute_uv=False):
-    return np.linalg.svd(X,full_matrices=False, compute_uv=compute_uv)
+def numpy_svd(X,compute_uv=False, full_matrices=False):
+    return np.linalg.svd(X,full_matrices=full_matrices, compute_uv=compute_uv)
 
 def lik2(param, *args):
     if len(args) == 1:
@@ -113,9 +113,18 @@ def standerr(U, y, Sii, UTy, g, e):
     eerr = np.sqrt(cov[1][1])
     return [gerr, eerr]
 
-def standerr_dev(U, y, Sii, UTy, g, e):
-    print(g,e)
-    n = len(y)
+def standerr_dev(U, y, Sii, UTy, g, e, cov=False):
+    
+    if cov:
+        n = len(UTy)
+        assert n>10
+    else:
+        n = len(y)
+    print(g,e,n)
+    # if isinstance(cov,int):
+    #     n = len(y) - cov
+    # else:
+    #     n = len(y)
     nulity = max(0, n - len(Sii))
     L11 = -0.5*(np.sum(np.square(Sii) / (g * Sii + e)**2))+np.sum(np.square(UTy.flatten()) * np.square(Sii) / (g * Sii + e)**3) 
     L22 = -0.5*(np.sum(1. / (g * Sii + e)**2)+nulity*1./e**2) + np.sum(np.square(UTy.flatten()) / (g * Sii + e)**3) +  np.sum(np.square((y - U @ UTy).flatten()) / e**3)
@@ -150,10 +159,14 @@ def dlik(logdelta, *args):
     return der
 
 
-def VarComponentEst(S, U, y, theta=False, dtype='quant',center=True):
+def VarComponentEst(S, U, y, theta=False, dtype='quant',center=True,cov=False):
     # delta is the initial guess of delta value
-    n = y.shape[0]
+    
     UTy = U.T @ y  # O(ND)
+    if cov:
+        n = UTy.shape[0]
+    else:
+        n = y.shape[0]
     if n > len(S):
         LLadd1 = np.sum(np.square(y - U @ UTy))
     else:
@@ -190,7 +203,7 @@ def VarComponentEst(S, U, y, theta=False, dtype='quant',center=True):
 
     sq_sigma_e = delta * sq_sigma_g
     time0 = time.time()
-    gerr, eerr = standerr_dev(U, y, S, UTy, sq_sigma_g, sq_sigma_e)
+    gerr, eerr = standerr_dev(U, y, S, UTy, sq_sigma_g, sq_sigma_e, cov=cov)
     time1 = time.time()
     # print('error bound time is {}'.format(time1-time0))
 
@@ -373,7 +386,7 @@ def getfullComponentPerm(X,
         print(U.shape)
         U = U[:,filtered]
         print(U.shape,S.shape)
-        var_est=VarComponentEst(S,U,y)
+        var_est=VarComponentEst(S,U,y,cov=True)
         sigma2_gxg=var_est[1]
         sigma2_e=var_est[2]
         trace=np.sum(S) # compute the trace of phi phi.T
