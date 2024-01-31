@@ -102,6 +102,23 @@ def lik(logdelta, *args):
     return (L1 + L2)
 
 
+def lik_cov(logdelta, *args):
+    if len(args) == 1:
+        nargs = args
+        (n, Sii, yt, LLadd1) = nargs[0]
+    else:
+        (n, Sii, yt, LLadd1) = args
+    yt = yt.flatten()
+    nulity = max(0, n - len(Sii)) ## N - K - K'
+    L1 = (sum(np.log(Sii + np.exp(logdelta))) +
+          nulity * logdelta) / 2  # The first part of the log likelihood
+    syt = np.square(yt)
+
+    L2 = (n / 2.0) * np.log((sum(syt / (Sii + np.exp(logdelta))) - sum(syt / np.exp(logdelta)) +
+                                 (LLadd1 / (np.exp(logdelta)))))
+    return (L1 + L2)
+
+
 def standerr(U, y, Sii, UTy, g, e):
     L11 = np.sum(np.square(UTy.flatten()) * np.square(Sii) / (g * Sii + e)**3)
     L22 = np.sum(np.square(y - U @ UTy).flatten() / (e)**3) + np.sum(
@@ -113,7 +130,7 @@ def standerr(U, y, Sii, UTy, g, e):
     eerr = np.sqrt(cov[1][1])
     return [gerr, eerr]
 
-def standerr_dev(U, y, Sii, UTy, g, e, cov=False):
+def standerr_dev(U, y, Sii, UTy, g, e):
     
     if cov:
         n = len(UTy)
@@ -132,6 +149,23 @@ def standerr_dev(U, y, Sii, UTy, g, e, cov=False):
     # print(((g * Sii + e)**3).shape)
     # print(f'L22 is {L22}')
     L12 = -0.5*np.sum(Sii/np.square(g * Sii + e))+np.sum(np.square(UTy.flatten()) * Sii / (g * Sii + e)**3)
+    # print(np.sum(np.square(UTy.flatten()) * Sii / (g * Sii + e)**3))
+    # print(-0.5*np.sum(Sii/(g * Sii + e)**2))
+    L = np.array([[L11, L12], [L12, L22]])
+    # print(L)
+    cov = np.linalg.inv(L)
+    # print(cov)
+    gerr = np.sqrt(cov[0][0])
+    eerr = np.sqrt(cov[1][1])
+    return [gerr, eerr]
+
+
+def standerr_dev_cov(Sii, yt, LLadd1, n, g, e):
+
+    nulity = max(0, n - len(Sii))
+    L11 = -0.5*(np.sum(np.square(Sii) / np.square(g * Sii + e)))+np.sum(np.square(yt.flatten()) * np.square(Sii) / (g * Sii + e)**3) 
+    L22 = -0.5*(np.sum(1. / np.square(g * Sii + e))+nulity*1./e**2) + np.sum(np.square(yt.flatten()) / (g * Sii + e)**3) - np.sum(np.square(yt.flatten())/e**3) +  LLadd1 / e**3
+    L12 = -0.5*np.sum(Sii / np.square(g * Sii + e))+np.sum(np.square(yt.flatten()) * Sii / (g * Sii + e)**3)
     # print(np.sum(np.square(UTy.flatten()) * Sii / (g * Sii + e)**3))
     # print(-0.5*np.sum(Sii/(g * Sii + e)**2))
     L = np.array([[L11, L12], [L12, L22]])
@@ -163,10 +197,8 @@ def VarComponentEst(S, U, y, theta=False, dtype='quant',center=True,cov=False):
     # delta is the initial guess of delta value
     
     UTy = U.T @ y  # O(ND)
-    if cov:
-        n = UTy.shape[0]
-    else:
-        n = y.shape[0]
+
+    n = y.shape[0]
     if n > len(S):
         LLadd1 = np.sum(np.square(y - U @ UTy))
     else:
@@ -208,6 +240,72 @@ def VarComponentEst(S, U, y, theta=False, dtype='quant',center=True,cov=False):
     # print('error bound time is {}'.format(time1-time0))
 
     L1 = -lik(logdelta, n, S, UTy, LLadd1) - 0.5 * n * np.log(np.pi) - 0.5 * n
+    yTy = (y.T @ y)[0]
+    if dtype == 'quant':
+        sq_sigma_e0 = yTy / n
+    else:
+        mu0 = np.sum(y) / n
+        sq_sigma_e0 = mu0 * (1 - mu0)
+
+
+#    sq_sigma_e0 = sq_sigma_e
+    L0 = -0.5 * (n * np.log(np.pi) + n * np.log(sq_sigma_e0) +
+                 yTy / sq_sigma_e0)
+    return [
+        h, sq_sigma_g, sq_sigma_e, gerr, eerr
+    ]
+    
+    
+def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
+    '''
+    :S: vector of shape (K')
+    :yt: stands for transformed y. Shape (K')
+    :y1: stands for B1^Ty. Shape (K)
+    :y: original trait. Shape (N)
+    '''
+    # delta is the initial guess of delta value
+    
+    
+    n = y.shape[0]-y1.shape[0] ## N-K
+    
+    LLadd1 = np.sum(np.square(y))-np.sum(np.square(y1)) ## sum_{i=1}^{N-K} yt_i^2
+    
+    
+    # optimizer = brent(lik, args=(n, S, UTy, LLadd1), brack = (-10, 10))
+    t0 = time.time()
+    optimizer = (minimize(lik_cov, [0], args=(n, S, yt, LLadd1), method = 'Nelder-Mead', options={'maxiter':400}))
+    # optimizer = (minimize(lik, [0],
+    #                       args=(n, S, UTy, LLadd1),
+    #                       method='L-BFGS-B',
+    #                       jac=dlik,
+    #                       options={
+    #                           'maxcor': 15,
+    #                           'ftol': 1e-10,
+    #                           'gtol': 1e-9,
+    #                           'maxfun': 30000,
+    #                           'maxiter': 30000,
+    #                           'maxls': 30
+    #                       }))
+    logdelta = optimizer.x[0]
+    t1 = time.time()
+    # print(f'optimization takes {t1-t0}')
+    # logdelta = optimizer
+    # fun = -1*lik(logdelta, n, S, UTy, LLadd1)
+    fun = -1 * optimizer.fun
+
+    delta = np.exp(logdelta)
+    h = 1 / (delta + 1)  # heritability
+
+    sq_sigma_g = (sum(np.square(yt.flatten()) / (S+delta)) - sum(np.square(yt.flatten()) / delta)  + LLadd1 / delta) / n
+
+    sq_sigma_e = delta * sq_sigma_g
+    time0 = time.time()
+    # Sii, yt, LLadd1, n, g, e
+    gerr, eerr = standerr_dev_cov(S, yt, LLadd1, n, sq_sigma_g, sq_sigma_e)
+    time1 = time.time()
+    # print('error bound time is {}'.format(time1-time0))
+
+    L1 = -lik_cov(logdelta, n, S, yt, LLadd1) - 0.5 * n * np.log(np.pi) - 0.5 * n
     yTy = (y.T @ y)[0]
     if dtype == 'quant':
         sq_sigma_e0 = yTy / n
@@ -342,12 +440,19 @@ def getfullComponentPerm(X,
     n = Z.shape[0]
     M = Z.shape[1]
 
-    if X is None:
-        X = np.ones((n, 1))
-    else:
-        X = np.concatenate((np.ones((n, 1)), X), axis=1)
+    
+    if center:
+        if X is None:
+            X = np.ones((n, 1))
+        else:
+            X = np.concatenate((np.ones((n, 1)), X), axis=1)
     y = y.reshape(-1, 1)
-    k = X.shape[1]
+    if X is None:
+        k = 0
+    else:
+        k = X.shape[1]
+        B1, _, _ = numpy_svd(X,compute_uv=True)
+        y1 = B1.T@y
     # yperm = np.random.permutation(y)
     P1 = inverse(X)
     start = time.time()
@@ -372,10 +477,10 @@ def getfullComponentPerm(X,
 
     t1 = time.time()
     # print(f'svd takes {t1-t0}')
-    t0 = time.time()
+    # t0 = time.time()
 
     # Q_perm = np.sum(np.square(yperm.T@Z - yperm.T@X@P1@X.T@Z))
-    t1 = time.time()
+    # t1 = time.time()
     S = np.square(S)
     S[S <= 1e-6] = 0
     filtered=np.nonzero(S)[0]
@@ -386,7 +491,11 @@ def getfullComponentPerm(X,
         print(U.shape)
         U = U[:,filtered]
         print(U.shape,S.shape)
-        var_est=VarComponentEst(S,U,y,cov=True)
+        if X is None:
+            var_est=VarComponentEst(S,U,y)
+        else:
+            yt = U.T@y
+            var_est=VarComponentEst_Cov(S,yt,y1,y) # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
         sigma2_gxg=var_est[1]
         sigma2_e=var_est[2]
         trace=np.sum(S) # compute the trace of phi phi.T
@@ -691,7 +800,7 @@ if __name__ == "__main__":
     from sklearn import preprocessing
     from sklearn.kernel_approximation import PolynomialCountSketch
     print(f'Simulating linear effect with h2 = 0.5')
-    for sigma1sq, sigma2sq in [(0.01, 0.99)]:
+    for sigma1sq, sigma2sq in [(0.3, 0.7)]:
         N = 5000
         M = 10
         D = M * 50
@@ -700,13 +809,16 @@ if __name__ == "__main__":
         
 
         mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
-        for i in range(1):
+        for i in range(10):
             Z = mapping.fit_transform(X)
             Z = preprocessing.scale(Z)
             print(f'Z shape is {Z.shape}')
             eps = np.random.randn(N) * np.sqrt(sigma2sq)
             beta = np.random.randn(Z.shape[1]) * np.sqrt(sigma1sq)*1.0/np.sqrt(Z.shape[1])
+            alpha =  np.random.randn(X.shape[1]) * np.sqrt(sigma1sq)*1.0/np.sqrt(X.shape[1])
             y = Z.dot(beta) + eps
+            print(f'y var is {np.var(y)}')
+            y += X.dot(alpha)
             # plist = getfullComponent(X,
             #                          Z,
             #                          y,
@@ -714,7 +826,8 @@ if __name__ == "__main__":
             #                          center=True,
             #                          method="Julia")
             # print(f'FastKAST p value is {plist[0][0]}')
-            results = getfullComponentPerm(None,Z*1.0/np.sqrt(Z.shape[1]),y.reshape(1,-1),VarCompEst=True)
+            # results = getfullComponentPerm(None,Z*1.0/np.sqrt(Z.shape[1]),y.reshape(1,-1),VarCompEst=True)
+            results = getfullComponentPerm(X,Z*1.0/np.sqrt(Z.shape[1]),y.reshape(1,-1),VarCompEst=True)
             # print(results)
             # results.append((plist, sigma1sq / (sigma1sq + sigma2sq), N, M, D))
 
