@@ -3,6 +3,7 @@ import os, re
 import time
 from sys import path as syspath
 from os import path as ospath
+from scipy import stats
 # from sklearn.linear_model import LinearRegression
 from sklearn.metrics.pairwise import pairwise_kernels
 # from sklearn.metrics.pairwise import additive_chi2_kernel
@@ -18,6 +19,35 @@ from fastmle_res_jax import getmleComponent
 from sklearn.impute import SimpleImputer
 from utils import QMC_RFF
 
+def direct_self(geno_matrix_in):
+    N=geno_matrix_in.shape[0]
+    M=geno_matrix_in.shape[1]
+    D = int((M*(M+1))/2)
+    exact = np.zeros((N, D))
+    s = 0
+    for i in range(M):
+        for j in range(i, M):
+            feature = geno_matrix_in[:,i]*geno_matrix_in[:,j]
+            exact[:,s] = feature
+            s += 1
+    exact_standard = stats.zscore(exact)
+
+    return exact_standard
+
+def direct_noself(geno_matrix_in):
+    N=geno_matrix_in.shape[0]
+    M=geno_matrix_in.shape[1]
+    D = int((M*(M-1))/2)
+    exact = np.zeros((N, D))
+    s = 0
+    for i in range(M):
+        for j in range(i+1, M):
+            feature = geno_matrix_in[:,i]*geno_matrix_in[:,j]
+            exact[:,s] = feature
+            s += 1
+    exact_standard = stats.zscore(exact)
+
+    return exact_standard
 
 def estimateSigmasGeneral(y,
                           Xc,
@@ -27,7 +57,9 @@ def estimateSigmasGeneral(y,
                           Random_state=1,
                           method='Perm',
                           Test='nonlinear'):
-    np.random.seed(int.from_bytes(os.urandom(4), byteorder='little'))
+    # np.random.seed(int.from_bytes(os.urandom(4), byteorder='little'))
+
+    np.random.seed(1)
 
     if how == 'mle':
         gamma = params['gamma'] if params['gamma'] is not None else (
@@ -63,18 +95,19 @@ def estimateSigmasGeneral(y,
         # print(QMC)
         # t0 = time.time()
         if QMC == 'Vanilla':
-            rbfs = RBFSampler(gamma=gamma,
-                              n_components=params['D'],
-                              random_state=Random_state)
-            ps = PolynomialCountSketch(degree=2, 
-                                       coef0=0, 
-                                       gamma=gamma, 
-                                       n_components=params['D'], 
-                                       random_state=Random_state)
-            if params['kernel_metric'] == 'rbf':
-                Z = rbfs.fit_transform(X)
-            else:
-                Z = ps.fit_transform(X)
+            # rbfs = RBFSampler(gamma=gamma,
+            #                   n_components=params['D'],
+            #                   random_state=Random_state)
+            # ps = PolynomialCountSketch(degree=2, 
+            #                            coef0=0, 
+            #                            gamma=gamma, 
+            #                            n_components=params['D'], 
+            #                            random_state=Random_state)
+            # if params['kernel_metric'] == 'rbf':
+            #     Z = rbfs.fit_transform(X)
+            # else:
+            #     Z = ps.fit_transform(X)
+            Z = direct_self(X)
         else:
             Z = QMC_RFF(gamma=gamma,
                         d=X.shape[1],
@@ -124,13 +157,24 @@ def estimateSigmasGeneral(y,
                                      y,
                                      center=center,
                                      Test=Test,
-                                     Perm=100)
-            states = [H[1] for H in h]
-            pvals = [H[0] for H in h]
+                                     Perm=100,
+                                     VarCompEst=True)
+            v = h['varcomp']
+            p = h['pval']
+
+            pvals = [H[0] for H in p]
+            states = [H[1] for H in p]
+
+            h = v[0]
+            sigma_gxg = v[1]
+            sigma_e = v[2]
+            err_g = v[3]
+            err_e = v[4]
+
             t1 = time.time()
             SKAT_time = t1 - t0
             # print(f'SKAT Perm takes {t1-t0}')
-            return (pvals, SKAT_time, states)
+            return (pvals, h, sigma_gxg, sigma_e, err_g, err_e, SKAT_time, states)
 
         elif method == 'CCT' or method == 'vary':
             t0 = time.time()
