@@ -88,7 +88,7 @@ def paraCompute(args):
     if end_index-start_index <=3:
         print(f'Warning: target window size too small, numerical issue may encounter')
     start = start_index
-    end = end_index
+    end = end_index + 1
     wlen = end - start
     t0 = time.time()
     try:
