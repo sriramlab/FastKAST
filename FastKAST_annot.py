@@ -84,7 +84,7 @@ def CMC(pvals, ws=None):
 
 
 def paraCompute(args):
-    start_index, end_index = args
+    gene, pStart, pEnd,start_index,end_index,NumSNPs = args
     if end_index-start_index <=3:
         print(f'Warning: target window size too small, numerical issue may encounter')
     start = start_index
@@ -173,30 +173,29 @@ def paraCompute(args):
         # params = dict(gamma=gamma, kernel_metric='rbf', D=D, center=True, hutReps=250)
         # print('start rbf')
         print(f'Start computing FastKAST')
-        SKAT, FastKAST_time, states = estimateSigmasGeneral(y,
+        pvals,h,sigma_gxg,sigma_e,err_g,err_e,FastKAST_time,states = estimateSigmasGeneral(y,
                                                             c,
                                                             x,
                                                             how='fast_mle',
                                                             params=params,
                                                             method=HP,
                                                             Test=Test)
-        print(f'Start computing Exact kernel')
+        # print(f'Start computing Exact kernel')
         # SKAT_MLE,Exact_time, mle_states  = estimateSigmasGeneral(y, c, x, how='mle', params=params)
         SKAT_MLE = None
-        if len(SKAT) == 0:
+        if len(pvals) == 0:
             continue
             # return (None,None,None,None,Index,0,0,chrome)
-        SKATs.append(SKAT)
+        SKATs.append(pvals)
         FastKAST_times.append(FastKAST_time)
     t1 = time.time()
 
     ### SKATs: N*M matrix, with N as number of hyperprameter tested, M as number of
 
     if len(gammas) == 1:
-        pval = SKATs[0][0]
+        pval = pvals[0]
         print(f'pval is {pval}')
-        return (pval, None, FastKAST_times, start_index, end_index, N, d, None,
-                states, SKAT_MLE, count)
+        return (pval, h, sigma_gxg, sigma_e, err_g, err_e, None, FastKAST_times, start_index, end_index, gene, N, d, None, SKAT_MLE, states, count)
     elif HP == 'Perm':
         (pval, bindex), p_perm = flatten_p(SKATs), flatten_perm(SKATs)
         bgamma = gammas[bindex]
@@ -273,12 +272,8 @@ def parseargs():  # handle user arguments
                         default='nonlinear',
                         choices=['nonlinear', 'higher', 'general'],
                         help='What type of kernel to test')
-    parser.add_argument('--kernel',
-                        default='rbf',
-                        choices=['rbf', 'polynomial'],
-                        help='Which kernel to use')
     parser.add_argument('--gammas',
-                        default=[0.01, 0.1, 1],
+                        default=[1],
                         nargs='+',
                         type=float)
     parser.add_argument('--tindex',type=int)
@@ -326,7 +321,7 @@ if __name__ == "__main__":
         gene_annot = gene_annot.dropna().astype(int)
         print(gene_annot)
     else:
-        gene_annot = pd.read_csv(annot_path, delimiter=' ')
+        gene_annot = pd.read_csv(annot_path, delimiter=',')
 
     gene_annot_sel = gene_annot.iloc[CR*tindex:CR*(tindex+1)].reset_index(drop=True) # working on the current range of the annotation
     G = open_bed(bed)
@@ -375,10 +370,10 @@ if __name__ == "__main__":
     filename = args.filename
     if args.thread == 1:
         count = 0
-        for rownum in tqdm(range(0, gene_annot.shape[0])):
+        for rownum in tqdm(range(0, gene_annot_sel.shape[0])):
             count += 1
-            if rownum < gene_annot.shape[0]:
-                w = gene_annot.iloc[rownum]
+            if rownum < gene_annot_sel.shape[0]:
+                w = gene_annot_sel.iloc[rownum]
             else:
                 w = None
                 break
