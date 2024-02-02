@@ -15,7 +15,7 @@ from bed_reader import open_bed
 import pandas_plink
 from pandas_plink import read_plink1_bin
 from joblib import dump, load
-from estimators import *
+from estimators_mod import *
 from utils import *
 
 
@@ -285,7 +285,7 @@ def parseargs():  # handle user arguments
 if __name__ == "__main__":
     args = parseargs()
     Test = args.test
-    kernel = args.kernel
+    kernel = 'rbf'
     HP = args.HP
     # set parameters
     Map_Dim = args.map
