@@ -8,6 +8,7 @@ from scipy.linalg import svd
 import time
 from numpy.linalg import inv
 import scipy
+
 from scipy.linalg import pinvh
 import fastlmmclib.quadform as qf
 from chi2comb import chi2comb_cdf, ChiSquared
@@ -15,6 +16,8 @@ from sklearn.linear_model import LogisticRegression
 import scipy
 from numpy.core.umath_tests import inner1d
 from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import Ridge
+from sklearn.linear_model import LinearRegression
 
 # def jax_svd(X):
 #     return svd(X, full_matrices = False, compute_uv=False).block_until_ready()
@@ -793,23 +796,68 @@ def getmleComponent(X, K, y, center=False):
     return [p_value1, p_value_perm]
 
 
+def Bayesian_Posterior(X,Z,y,g,e,center=True,full_cov=False):
+    '''
+    Feature level posterior estimation
+    Assume Z = Phi(G)/sqrt(D)
+    '''
+    
+    t0 = time.time()
+    n = Z.shape[0]
+    D = Z.shape[1]
+    Z = Z*np.sqrt(D)
+    
+
+    if center:
+        if X is None:
+            X = np.ones((n, 1))
+        else:
+            X = np.concatenate((np.ones((n, 1)), X), axis=1)
+            
+            
+    y = y.reshape(-1, 1)
+
+    # yperm = np.random.permutation(y)
+    P1 = inverse(X)
+
+    Z = projection(Z, X, P1) # Z = Z - X@P1@(X.T@Z)
+    
+    y_proj = projection(y,X,P1)
+    
+    inverse_factor = pinvh(Z.T@Z + np.identity(D)*(D*e/g)) # (phi(G)^T phi(G)) + reg*I_D)^{-1}
+    
+    mu = (inverse_factor)@(Z.T@y_proj)
+    mu = mu.flatten()
+    cov = e*inverse_factor
+    
+    
+    if full_cov:
+        return mu, cov
+    else:
+        return mu, np.sqrt(np.diag(cov))
+    
+
+
 if __name__ == "__main__":
+    import statsmodels.api as sm
+    from regressors import stats
+    import scipy.stats
     results = []
     dtype = 'quant'
     np.random.seed(1)
     from sklearn import preprocessing
     from sklearn.kernel_approximation import PolynomialCountSketch
     print(f'Simulating linear effect with h2 = 0.5')
-    for sigma1sq, sigma2sq in [(0.3, 0.7)]:
-        N = 5000
-        M = 10
+    for sigma1sq, sigma2sq in [(0.1, 0.9)]:
+        N = 10000
+        M = 5
         D = M * 50
         gamma = 0.1
-        X = np.random.binomial(2, np.random.uniform(0.3, 0.7, M), (N, M))
+        X = np.random.binomial(2, np.random.uniform(0.1, 0.5, M), (N, M))
         
 
-        mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
-        for i in range(10):
+        mapping = PolynomialFeatures((2, 2),interaction_only=False,include_bias=False)
+        for i in range(1):
             Z = mapping.fit_transform(X)
             Z = preprocessing.scale(Z)
             print(f'Z shape is {Z.shape}')
@@ -828,6 +876,28 @@ if __name__ == "__main__":
             # print(f'FastKAST p value is {plist[0][0]}')
             # results = getfullComponentPerm(None,Z*1.0/np.sqrt(Z.shape[1]),y.reshape(1,-1),VarCompEst=True)
             results = getfullComponentPerm(X,Z*1.0/np.sqrt(Z.shape[1]),y.reshape(1,-1),VarCompEst=True)
+            g, e = results['varcomp'][1], results['varcomp'][2]
+            print(f'g_est: {g}; e_est: {e}')
+            mu, cov = Bayesian_Posterior(X,Z*1.0/np.sqrt(Z.shape[1]),y,g,e)
+            print(f'True betas: {beta}')
+            print(f'beta_est: {mu}; std_est: {cov}')
+            p_value = scipy.stats.norm.sf(abs(mu/cov))*2
+            print(f'Ridge p_values: {p_value}')
+            
+            
+            reg_1 = LinearRegression()
+            y_res = y - reg_1.fit(X, y).predict(X)
+            reg = Ridge(alpha=Z.shape[1]*e/g)
+            reg.fit(Z,y_res)
+            print(f'Ridge coeff: {reg.coef_}')
+            
+            pvals_ridge=stats.coef_pval(reg, Z, y_res)
+            print(f'Ridge ground pval: {pvals_ridge[1:]}')
+            
+            model = sm.OLS(y_res, Z)
+            model = model.fit()
+            OLS_pvalues=model.pvalues
+            print(f'OLS pvals: {OLS_pvalues}')
             # print(results)
             # results.append((plist, sigma1sq / (sigma1sq + sigma2sq), N, M, D))
 
