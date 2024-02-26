@@ -115,6 +115,8 @@ def paraCompute(args):
         results['Bayesian_mean'] = mu
         results['Bayesian_std'] = cov
         results['Bayesian_pval'] = p_values
+        
+    return results
     
 
 
