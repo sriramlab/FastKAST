@@ -91,7 +91,6 @@ def paraCompute(args):
             if np.max(r_squares) <= LDthresh:
                 break
         
-            
     
     start = start_index
     end = end_index + 1
@@ -153,7 +152,7 @@ def paraCompute(args):
     x = scaler.fit_transform(x)
     t1 = time.time()
     N = x.shape[0]
-    # print(f'window shape is {x.shape}')
+    print(f'window shape is {x.shape}; covariate shape is {covarfile.shape}; covariate+sw shape is: {c.shape}')
     # y = y_new
 
     # for hyperparameter selection, simply replace the following list with a list of gamma values
@@ -246,7 +245,7 @@ if __name__ == "__main__":
     bimfile.columns = ['chr', 'chrpos', 'MAF', 'pos', 'MAJ', 'MIN']
 
    
-    gene_annot = np.loadtxt(annot_path)
+    gene_annot = np.loadtxt(annot_path,ndmin=2)
     print(f'Annotation file contains {gene_annot.shape[1]} sets to be tested')
     
     G = open_bed(bed)
@@ -270,8 +269,7 @@ if __name__ == "__main__":
 
     print('Finish preparing the indices')
 
-    Y = pd.read_csv(args.phen, delim_whitespace=True,
-                    header=None).iloc[:, -1].values
+    Y = pd.read_csv(args.phen, delim_whitespace=True).iloc[:, -1].values
     Yeffect = (Y != -9) & (~np.isnan(Y))
     Y = Y[Yeffect]
     if covar != None:
