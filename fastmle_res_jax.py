@@ -259,6 +259,77 @@ def VarComponentEst(S, U, y, theta=False, dtype='quant',center=True,cov=False):
     ]
     
     
+def VarComponentEst_Cov_std(S, yt, y1, y, dtype='quant'):
+    '''
+    :S: vector of shape (K')
+    :yt: stands for transformed y. Shape (K')
+    :y1: stands for B1^Ty. Shape (K)
+    :y: original trait. Shape (N)
+    '''
+    # delta is the initial guess of delta value
+    
+    
+    n = y.shape[0]-y1.shape[0] ## N-K
+    # print(f'n is {n}')
+    
+    LLadd1 = np.sum(np.square(y))-np.sum(np.square(y1)) ## sum_{i=1}^{N-K} yt_i^2
+    
+    ytilde_scale = np.sqrt(LLadd1/n)
+    print(f'y tilde std: {ytilde_scale}')
+    S = S/ytilde_scale
+    yt = yt/ytilde_scale
+    
+    # optimizer = brent(lik, args=(n, S, UTy, LLadd1), brack = (-10, 10))
+    t0 = time.time()
+    # optimizer = (minimize(lik_cov, [0], args=(n, S, yt, LLadd1), method = 'Nelder-Mead', options={'maxiter':400}))
+    optimizer = (minimize(lik_cov, [0], args=(n, S, yt, n), method = 'Nelder-Mead', options={'maxiter':400}))
+    # optimizer = (minimize(lik, [0],
+    #                       args=(n, S, UTy, LLadd1),
+    #                       method='L-BFGS-B',
+    #                       jac=dlik,
+    #                       options={
+    #                           'maxcor': 15,
+    #                           'ftol': 1e-10,
+    #                           'gtol': 1e-9,
+    #                           'maxfun': 30000,
+    #                           'maxiter': 30000,
+    #                           'maxls': 30
+    #                       }))
+    logdelta = optimizer.x[0]
+    t1 = time.time()
+    # print(f'optimization takes {t1-t0}')
+    # logdelta = optimizer
+    # fun = -1*lik(logdelta, n, S, UTy, LLadd1)
+    fun = -1 * optimizer.fun
+
+    delta = np.exp(logdelta)
+    # h = 1 / (delta + 1)  # heritability
+
+    sq_sigma_g = (sum(np.square(yt.flatten()) / (S+delta)) - sum(np.square(yt.flatten()) / delta)  + n / delta) / n
+    
+
+    sq_sigma_e = delta * sq_sigma_g
+    time0 = time.time()
+    h = sq_sigma_g / (sq_sigma_e + sq_sigma_g)  # heritability
+    # Sii, yt, LLadd1, n, g, e
+    gerr, eerr = standerr_dev_cov(S, yt, n, n, sq_sigma_g, sq_sigma_e)
+    time1 = time.time()
+    # print('error bound time is {}'.format(time1-time0))
+
+    yTy = (y.T @ y)[0]
+    if dtype == 'quant':
+        sq_sigma_e0 = yTy / n
+    else:
+        mu0 = np.sum(y) / n
+        sq_sigma_e0 = mu0 * (1 - mu0)
+
+
+
+    return [
+        h, sq_sigma_g, sq_sigma_e, gerr, eerr
+    ]
+    
+    
 def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
     '''
     :S: vector of shape (K')
@@ -300,6 +371,7 @@ def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
     h = 1 / (delta + 1)  # heritability
 
     sq_sigma_g = (sum(np.square(yt.flatten()) / (S+delta)) - sum(np.square(yt.flatten()) / delta)  + LLadd1 / delta) / n
+    
 
     sq_sigma_e = delta * sq_sigma_g
     time0 = time.time()
@@ -436,7 +508,8 @@ def getfullComponentPerm(X,
                          method='Numpy',
                          Perm=10,
                          Test='nonlinear',
-                         VarCompEst=False):
+                         VarCompEst=False,
+                         varCompStd=False):
     # X is the covariates that need to be regressed out, res is the residule after regressing out the linear effect
     # delta is the initial guess of delta value
     t0 = time.time()
@@ -498,7 +571,11 @@ def getfullComponentPerm(X,
             var_est=VarComponentEst(S,U,y)
         else:
             yt = U.T@y
-            var_est=VarComponentEst_Cov(S,yt,y1,y) # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
+            if varCompStd:
+                # standardized hertability for sigma_quad^2
+                var_est=VarComponentEst_Cov_std(S,yt,y1,y) # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
+            else:
+                var_est=VarComponentEst_Cov(S,yt,y1,y) # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
         sigma2_gxg=var_est[1]
         sigma2_e=var_est[2]
         trace=np.sum(S) # compute the trace of phi phi.T
@@ -848,25 +925,27 @@ if __name__ == "__main__":
     from sklearn import preprocessing
     from sklearn.kernel_approximation import PolynomialCountSketch
     print(f'Simulating linear effect with h2 = 0.5')
-    for sigma1sq, sigma2sq in [(0.1, 0.9)]:
-        N = 10000
-        M = 5
+    for sigma1sq, sigma2sq in [(0.1, 0.5)]:
+        N = 5000
+        M = 20
         D = M * 50
         gamma = 0.1
         X = np.random.binomial(2, np.random.uniform(0.1, 0.5, M), (N, M))
         
 
         mapping = PolynomialFeatures((2, 2),interaction_only=False,include_bias=False)
-        for i in range(1):
+        for i in range(3):
+            sigmalinsq=0.4
             Z = mapping.fit_transform(X)
             Z = preprocessing.scale(Z)
             print(f'Z shape is {Z.shape}')
             eps = np.random.randn(N) * np.sqrt(sigma2sq)
             beta = np.random.randn(Z.shape[1]) * np.sqrt(sigma1sq)*1.0/np.sqrt(Z.shape[1])
-            alpha =  np.random.randn(X.shape[1]) * np.sqrt(sigma1sq)*1.0/np.sqrt(X.shape[1])
+            alpha =  np.random.randn(X.shape[1]) * np.sqrt(sigmalinsq)*1.0/np.sqrt(X.shape[1])
             y = Z.dot(beta) + eps
             print(f'y var is {np.var(y)}')
-            y += X.dot(alpha)
+            # y += X.dot(alpha)
+            print(f'y var is {np.var(y)}')
             # plist = getfullComponent(X,
             #                          Z,
             #                          y,
@@ -875,29 +954,29 @@ if __name__ == "__main__":
             #                          method="Julia")
             # print(f'FastKAST p value is {plist[0][0]}')
             # results = getfullComponentPerm(None,Z*1.0/np.sqrt(Z.shape[1]),y.reshape(1,-1),VarCompEst=True)
-            results = getfullComponentPerm(X,Z*1.0/np.sqrt(Z.shape[1]),y.reshape(1,-1),VarCompEst=True)
+            results = getfullComponentPerm(X,Z*1.0/np.sqrt(Z.shape[1]),y.reshape(1,-1),VarCompEst=True,varCompStd=True)
             g, e = results['varcomp'][1], results['varcomp'][2]
             print(f'g_est: {g}; e_est: {e}')
             mu, cov = Bayesian_Posterior(X,Z*1.0/np.sqrt(Z.shape[1]),y,g,e)
-            print(f'True betas: {beta}')
-            print(f'beta_est: {mu}; std_est: {cov}')
+            # print(f'True betas: {beta}')
+            # print(f'beta_est: {mu}; std_est: {cov}')
             p_value = scipy.stats.norm.sf(abs(mu/cov))*2
-            print(f'Ridge p_values: {p_value}')
+            # print(f'Ridge p_values: {p_value}')
             
             
             reg_1 = LinearRegression()
             y_res = y - reg_1.fit(X, y).predict(X)
             reg = Ridge(alpha=Z.shape[1]*e/g)
             reg.fit(Z,y_res)
-            print(f'Ridge coeff: {reg.coef_}')
+           #  print(f'Ridge coeff: {reg.coef_}')
             
             pvals_ridge=stats.coef_pval(reg, Z, y_res)
-            print(f'Ridge ground pval: {pvals_ridge[1:]}')
+            # print(f'Ridge ground pval: {pvals_ridge[1:]}')
             
             model = sm.OLS(y_res, Z)
             model = model.fit()
             OLS_pvalues=model.pvalues
-            print(f'OLS pvals: {OLS_pvalues}')
+           #  print(f'OLS pvals: {OLS_pvalues}')
             # print(results)
             # results.append((plist, sigma1sq / (sigma1sq + sigma2sq), N, M, D))
 
