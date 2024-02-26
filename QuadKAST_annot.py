@@ -20,10 +20,38 @@ from fastmle_res_jax import *
 
 
 
+def LD_estimation(snp1, snps2, DEBUG=False):
+    
+    nanfilter1 = ~np.isnan(snp1).any(axis=1)
+    nanfilter2 = ~np.isnan(snps2).any(axis=1)
+    
+    nanfilter = nanfilter1&nanfilter2
+    snp1 = snp1[nanfilter]
+    snps2 = snps2[nanfilter]
+    
+    p = np.mean(snp1) / 2
+    q = np.mean(snps2,axis=0) / 2
+    
+    
+
+    # Calculate observed frequency of both minor alleles
+    # This requires identifying individuals with 1 or 2 for both SNPs and calculating the frequency
+    observedXY = np.mean((snp1 / 2) * (snps2 / 2))
+
+    # Calculate expected frequency under independence
+    expectedXY = p * q
+
+    # Calculate r^2
+    r_squared = ((observedXY - expectedXY) ** 2) / (p * (1 - p) * q * (1 - q))
+    if DEBUG:
+        print(f'r square value is: {r_squared}')
+    return r_squared
+
+
 def paraCompute(args):
     SNP_annot = args
-    
     indices_of_ones = np.where(SNP_annot==1)[0]
+    M = SNP_annot.shape[0]
     
     if len(indices_of_ones) ==0:
         raise Exception("Annotation file cannot have columns with all zeros")
@@ -34,16 +62,51 @@ def paraCompute(args):
     
     if end_index-start_index <=3:
         print(f'Warning: target window size too small, numerical issue may encounter')
+    
+    if LDthresh > 0 and Test != 'general': # estimate the superwindow
+        step_size=5
+        max_iter=40
+        snp1 = G.read(index=np.s_[Yeffect, start_index])
+        left_index = start_index
+
+        for i in range(1,max_iter+1): # a upper bound of 500 SNP in surrounding windows, with a step size of 10
+            snps2 = G.read(index=np.s_[Yeffect, max(0,start_index-i*step_size):max(0,start_index-(i-1)*step_size)])
+            left_index = max(0,start_index-i*step_size)
+            if left_index == 0:
+                break
+            r_squares = LD_estimation(snp1,snps2,DEBUG=False)
+            
+            if np.max(r_squares) <=LDthresh:
+                break
+        
+        snp1 = G.read(index=np.s_[Yeffect, end_index])
+        right_index = end_index
+        
+        for i in range(1,max_iter+1): # a upper bound of 500 SNP in surrounding windows, with a step size of 10
+            snps2 = G.read(index=np.s_[Yeffect, min(M,end_index+(i-1)*step_size):min(M,end_index+(i)*step_size)])
+            right_index = min(M,end_index+(i)*step_size)
+            if right_index == M:
+                break
+            r_squares = LD_estimation(snp1,snps2)
+            if np.max(r_squares) <= LDthresh:
+                break
+        
+            
+    
     start = start_index
     end = end_index + 1
     wlen = end - start
     t0 = time.time()
     try:
         if Test != 'general':
-            c = 2 - G.read(index=np.s_[Yeffect,
-                                       max(0, start - superWindow *
-                                           wlen):min(G.shape[1], end +
-                                                     superWindow * wlen)]
+            if LDthresh > 0:
+                print(f'estimated ld block start: {left_index}; end at {right_index}')
+                c = 2 - G.read(index=np.s_[Yeffect,left_index:right_index])
+            else:
+                c = 2 - G.read(index=np.s_[Yeffect,
+                                        max(0, start - superWindow *
+                                            wlen):min(G.shape[1], end +
+                                                        superWindow * wlen)]
                            )  ## 2-G replicate the old conversion scheme
             # c = G[Yeffect, max(0,start-superWindow*wlen):min(G.shape[1],end+superWindow*wlen)].values
         else:
@@ -56,10 +119,10 @@ def paraCompute(args):
         return (None, None, None, None, None, None, None, None, None, None,
                 None, None)
 
-    print(f'x shape is {x.shape}')
+    # print(f'x shape is {x.shape}')
     t1 = time.time()
 
-    print(f'read value takes {t1-t0}')
+    # print(f'read value takes {t1-t0}')
     if covar != None:
         if Test == 'general':
             c = covarfile
@@ -78,7 +141,7 @@ def paraCompute(args):
         else:
             nanfilter = nanfilter1
     t1 = time.time()
-    print(f'check nan takes {t1-t0}')
+    # print(f'check nan takes {t1-t0}')
     x = x[nanfilter]
     y = Y[nanfilter]
     scaler = StandardScaler()
@@ -117,7 +180,6 @@ def paraCompute(args):
         results['Bayesian_pval'] = p_values
         
     return results
-    
 
 
 
@@ -139,6 +201,11 @@ def parseargs():  # handle user arguments
     parser.add_argument('--featImp',
                         action='store_true',
                         help="Compute the feature importance")
+    
+    parser.add_argument('--LDthresh',
+                        type=float,
+                        default=0,
+                        help="Apply LD thresh to define superwindow")
     
     parser.add_argument(
         '--sw',
@@ -169,6 +236,7 @@ if __name__ == "__main__":
     featImp = args.featImp
     # read genotype data
     savepath = args.output
+    LDthresh = args.LDthresh
     bfile = args.bfile
     bed = bfile + '.bed'
     fam = bfile + '.fam'
