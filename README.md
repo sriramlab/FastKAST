@@ -45,7 +45,7 @@ negative/0 p value: out of precision level (default is 1e-14)
 p value = 2: p value calculation error 
 ```
 
-## Exmaple
+## Example
 To run the demo code with a fixed window size, you can run
 ```
 python FastKAST_annot.py --bfile ./example/sim --phen ./example/sim.pheno
