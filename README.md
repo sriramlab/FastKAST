@@ -10,34 +10,26 @@ FastKAST is a highly scalable method for testing complex nonlinear relationships
 3. (Optional) Install Julia and the FameSVD package [Li et al, 2019]. If FameSVD is not installed, SVD computation will reverse back to scipy package
 
 
-FastKAST receives the inpute genotype and phenotype, output p value.
+QuadKAST receives the inpute genotype and phenotype, output p value.
 ```
 * Input argument
  * ----------
  * bfile : prefix name of plink file (.bim, .bed, .fam)
- *     Genotype matrix
+ *     N x M Genotype matrix
  * covar : (Optional) Linear covariates features to exclude. (order should be the same as genotype data)
  *     Chi-squared distributions.
  * phen : plink file, space delimiter, fifth column is the phenotype value
  *     Phenotype need to be standardized
- * map : int
- *     Appriximated dimension factor (default is 50, which means 50*snps)
- * window : int
- *     The physical window size for each set
  * thread: int
  *     Number of thread to be use (default is 1)
  * sw: int
  *     Number of neighboring window included to totally regress out linear effect (default is 2)
  * annot: file
- *     Annotation file
+ *     Annotation file -- M x K boolean matrix. M: feature number; K: number of set tested. 1 indicates the inclusion of a feature.
  * filename: string
  *     Output file name
  * test: string
  *     Type of kernel test to use
- * kernel: string
- *     Which kernel to use
- * gammas: list
- *     Values of gamma to test with kernel
 * Output: a list of list with the following information(pkl file)
  * pval: best p-value at each set
  * p_perm: 10 permuted p-value at each set (useful to learn the distribution when testing multiple hyperparameters)
