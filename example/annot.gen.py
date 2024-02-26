@@ -18,5 +18,5 @@ for interval in annot_interval:
 
 annots = np.array(annots).T # transpose it -- row denote SNP index
 
-np.savetxt('sim.annot',annots, fmt="%i")
+np.savetxt('sim.sparse.annot',annots, fmt="%i")
     
