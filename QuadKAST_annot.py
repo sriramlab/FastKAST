@@ -97,7 +97,7 @@ def paraCompute(args):
     wlen = end - start
     t0 = time.time()
     try:
-        if Test != 'general':
+        if Test == 'nonlinear':
             if LDthresh > 0:
                 print(f'estimated ld block start: {left_index}; end at {right_index}')
                 c = 2 - G.read(index=np.s_[Yeffect,left_index:right_index])
@@ -123,12 +123,12 @@ def paraCompute(args):
 
     # print(f'read value takes {t1-t0}')
     if covar != None:
-        if Test == 'general':
+        if Test != 'nonlinear':
             c = covarfile
         else:
             c = np.concatenate((c, covarfile), axis=1)
     t0 = time.time()
-    if Test != 'general':
+    if Test == 'nonlinear':
         nanfilter = ~np.isnan(c).any(axis=1)
         c = c[nanfilter]
     else:
@@ -158,9 +158,23 @@ def paraCompute(args):
     # for hyperparameter selection, simply replace the following list with a list of gamma values
     t0 = time.time()
     
-    mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
-    Z = mapping.fit_transform(x)
-    # Z = direct(x)
+    if Test=='nonlinear':
+        mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
+        Z = mapping.fit_transform(x)
+        # Z = direct(x)
+        
+    elif Test=='linear':
+        # mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
+        # Z = mapping.fit_transform(x)
+        Z = x.copy()
+
+    elif Test=='general':
+        mapping = PolynomialFeatures(degree=2,include_bias=False)
+        Z = mapping.fit_transform(x)
+    
+    else:
+        raise Exception(f"The assigned test type {Test} is not supported")
+    
     scaler=StandardScaler()
     Z = scaler.fit_transform(Z)
     D = Z.shape[1]
@@ -220,7 +234,7 @@ def parseargs():  # handle user arguments
     parser.add_argument('--filename', default='sim', help='output file name')
     parser.add_argument('--test',
                         default='nonlinear',
-                        choices=['nonlinear', 'general'],
+                        choices=['linear', 'nonlinear', 'general'],
                         help='What type of kernel to test')
     args = parser.parse_args()
     return args
