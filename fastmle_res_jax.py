@@ -546,7 +546,8 @@ def getfullComponentPerm(X,
         U,S,_ = numpy_svd(Z,compute_uv=True)
     else:
         S = numpy_svd(Z)
-    # print(S)
+    print(S)
+    print(f'y mean is {np.mean(y)}; std is {np.std(y)}')
     # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
 
     Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z))
@@ -582,10 +583,10 @@ def getfullComponentPerm(X,
         sumK = np.sum(np.sum(Z,axis=0)**2) # compute the sum(Phi Phi.T)
         print(f'trace is {trace}; sum K is {sumK}')
 
-        cC=trace*1.0/(n*M) - sumK*1.0/(n**2*M)
-        print(f'Constant factor is {cC}')
-        h2_gxg=cC*sigma2_gxg/(cC*sigma2_gxg+((n-1)*1.0/n)*sigma2_e)
-        print(f'Before correction: {sigma2_gxg}; after correction: {h2_gxg}')
+        # cC=trace*1.0/(n*M) - sumK*1.0/(n**2*M)
+        # print(f'Constant factor is {cC}')
+        # h2_gxg=cC*sigma2_gxg/(cC*sigma2_gxg+((n-1)*1.0/n)*sigma2_e)
+        # print(f'Before correction: {sigma2_gxg}; after correction: {h2_gxg}')
         results['varcomp']=var_est
         print(f'Var est is: \n {var_est}')
     t0 = time.time()

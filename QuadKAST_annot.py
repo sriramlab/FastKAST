@@ -158,7 +158,7 @@ def paraCompute(args):
     # for hyperparameter selection, simply replace the following list with a list of gamma values
     t0 = time.time()
     
-    if Test=='nonlinear':
+    if Test=='nonlinear' or Test=='QuadOnly':
         mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
         Z = mapping.fit_transform(x)
         # Z = direct(x)
