@@ -179,7 +179,7 @@ def paraCompute(args):
     Z = scaler.fit_transform(Z)
     D = Z.shape[1]
     Z = Z*1.0/np.sqrt(D)
-    
+    print(f'Mapping dimension D is: {D}') 
     results = getfullComponentPerm(c,Z,y,VarCompEst=True,center=True)
     
     if featImp:
@@ -234,7 +234,7 @@ def parseargs():  # handle user arguments
     parser.add_argument('--filename', default='sim', help='output file name')
     parser.add_argument('--test',
                         default='nonlinear',
-                        choices=['linear', 'nonlinear', 'general'],
+                        choices=['linear', 'nonlinear', 'general', 'QuadOnly'],
                         help='What type of kernel to test')
     args = parser.parse_args()
     return args
