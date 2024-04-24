@@ -2,6 +2,7 @@ from sklearn.kernel_approximation import RBFSampler
 import numpy as np
 import traceback
 from scipy.optimize import minimize
+from sklearn.linear_model import RidgeCV, LinearRegression
 import sys
 import gc
 from scipy.linalg import svd
@@ -872,6 +873,42 @@ def getmleComponent(X, K, y, center=False):
     t1 = time.time()
     print(f'p value is {p_value1}')
     return [p_value1, p_value_perm]
+
+
+def FastKASTRegression(X,
+                       Z,
+                       y,
+                       alphas=[1e-1,1e0,1e1],
+                       regs=None, ## [covreg, SNPreg]
+                       emb_return=True):
+    '''
+    X is the covariates
+    Z is the transformation
+    y is the response variable
+    '''
+    
+    if regs is None:
+        regs = {'covreg':None,'SNPreg':None}
+    
+    if X is not None:
+        if regs['covreg'] is None:
+            linreg = LinearRegression().fit(X,y)
+            regs['covreg']=linreg
+        else:
+            linreg = regs['covreg']
+        y = y - linreg.predict(X)
+
+    print(regs)
+    if regs['SNPreg'] is None:
+        reg = RidgeCV(alphas = alphas)
+        reg.fit(Z, y)
+        regs['SNPreg'] = reg
+    else:
+        reg = regs['SNPreg']
+    if emb_return:
+        emb = reg.predict(Z)
+        return regs, emb
+    return regs
 
 
 def Bayesian_Posterior(X,Z,y,g,e,center=True,full_cov=False):
