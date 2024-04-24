@@ -125,7 +125,7 @@ def paraCompute(args):
 
     # print(f'read value takes {t1-t0}')
     if covar != None:
-        if Test != 'nonlinear':
+        if c.size==0:
             c = covarfile
         else:
             c = np.concatenate((c, covarfile), axis=1)
