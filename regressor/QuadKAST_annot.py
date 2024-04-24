@@ -2,21 +2,25 @@ import numpy as np
 import os, re
 import argparse
 import sys
+import h5py
 from sys import path as syspath
 from os import path as ospath
+import traceback
 import time
-import math
+import scipy
 import pandas as pd
 from tqdm import tqdm as tqdm
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import PolynomialFeatures
+from sklearn.impute import SimpleImputer
 import multiprocessing
 from bed_reader import open_bed
 import pandas_plink
 from pandas_plink import read_plink1_bin
 from joblib import dump, load
+sys.path.append('/u/scratch/b/boyang19/tmp/u/flashscratch/b/boyang19/QuadKAST/FastKAST/')
 from utils import *
-from fastmle_res_jax import *
+from fastmle_res_jax import FastKASTRegression, getfullComponentPerm, Bayesian_Posterior
 
 
 
@@ -49,19 +53,10 @@ def LD_estimation(snp1, snps2, DEBUG=False):
 
 
 def paraCompute(args):
-    SNP_annot = args
-    indices_of_ones = np.where(SNP_annot==1)[0]
-    M = SNP_annot.shape[0]
-    
-    if len(indices_of_ones) ==0:
-        raise Exception("Annotation file cannot have columns with all zeros")
-    else:
-        start_index = indices_of_ones[0]
-        end_index = indices_of_ones[-1]
-    
-    
+    start_index, end_index = args
     if end_index-start_index <=3:
         print(f'Warning: target window size too small, numerical issue may encounter')
+    M = G.shape[1]
     
     if LDthresh > 0 and Test != 'general': # estimate the superwindow
         step_size=5
@@ -108,15 +103,20 @@ def paraCompute(args):
                                                         superWindow * wlen)]
                            )  ## 2-G replicate the old conversion scheme
             # c = G[Yeffect, max(0,start-superWindow*wlen):min(G.shape[1],end+superWindow*wlen)].values
-        elif Test == 'general':
+            c_test = None ## shouldn't have c_test at this scenario
+        else:
             c = np.array([])
-        else: ## QuadOnly -- remove additive SNP as fixed effect
-            c = 2 - G.read(index=np.s_[Yeffect, SNP_annot.astype(bool)])
-        x = 2 - G.read(index=np.s_[Yeffect, SNP_annot.astype(bool)])
+            if stage=='infer':
+                c_test = np.array([])
+        x = 2 - G.read(index=np.s_[Yeffect, start:end])
+        if stage=='infer':
+            x_test = 2 - G_test.read(index=np.s_[Yeffect_test, start:end])
         # x = G[Yeffect, start:end].values
     except Exception as e:
-        print(f'Error: {e}')
-        print(f'start: {start}, end: {end}, Yeffect: {Yeffect}')
+        traceback.print_exc()
+        print(traceback.extract_tb(e.__traceback__)[0][1], e)
+        # raise RuntimeError("An error occurred at line {}: {}".format(traceback.extract_tb(e.__traceback__)[0][1], e))
+        print(f'start: {start}, end: {end}, Yeffect length: {len(Yeffect)}')
         return (None, None, None, None, None, None, None, None, None, None,
                 None, None)
 
@@ -124,42 +124,70 @@ def paraCompute(args):
     t1 = time.time()
 
     # print(f'read value takes {t1-t0}')
-    if covar != None:
+    if covar:
         if Test != 'nonlinear':
             c = covarfile
+            if stage=='infer':
+                c_test = covarfile_test
         else:
             c = np.concatenate((c, covarfile), axis=1)
+            if stage=='infer':
+                c_test = np.concatenate((c_test, covarfile), axis=1)
+        
     t0 = time.time()
     if Test == 'nonlinear':
         nanfilter = ~np.isnan(c).any(axis=1)
-        c = c[nanfilter]
     else:
         nanfilter1 = ~np.isnan(x).any(axis=1)
         if c.size > 1:
             nanfilter2 = ~np.isnan(c).any(axis=1)
             nanfilter = nanfilter1 & nanfilter2
-            c = c[nanfilter]
         else:
             nanfilter = nanfilter1
     t1 = time.time()
     # print(f'check nan takes {t1-t0}')
-    x = x[nanfilter]
-    y = Y[nanfilter]
+    if stage=='test':
+        x = x[nanfilter]
+        y = Y[nanfilter]
+        c = c[nanfilter]
+    else: # stage=='infer'
+        impute = SimpleImputer()
+        impute.fit(x)
+        x = impute.transform(x)
+        x_test = impute.transform(x_test)
+        
+   
+    
     scaler = StandardScaler()
-    t0 = time.time()
-    x = np.unique(x, axis=1, return_index=False)
+    x, dup_idx = np.unique(x, axis=1, return_index=True)
+    scaler.fit(x)
+    x = scaler.transform(x)
+    if stage=='infer':
+        x_test = x_test[:,dup_idx]
+        x_test = scaler.transform(x_test)
     if c.size > 1:
-        c = np.unique(c, axis=1, return_index=False)
-        c = scaler.fit_transform(c)
-    x = scaler.fit_transform(x)
+        scaler = StandardScaler()
+        c, dup_idx = np.unique(c, axis=1, return_index=True)
+        impute = SimpleImputer()
+        impute.fit(c)
+        c = impute.transform(c)
+        scaler.fit(c)
+        c = scaler.transform(c)
+        if stage=='infer':
+            c_test = c_test[:,dup_idx]
+            c_test = impute.transform(c_test)
+            c_test = scaler.transform(c_test)
+            
+    
     t1 = time.time()
     N = x.shape[0]
-    print(f'window shape is {x.shape}; covariate shape is {covarfile.shape}; covariate+sw shape is: {c.shape}')
+    print(f'window shape is {x.shape}; covariate+sw shape is: {c.shape}')
     # y = y_new
-
     # for hyperparameter selection, simply replace the following list with a list of gamma values
     t0 = time.time()
     
+    
+    mapping = None
     if Test=='nonlinear' or Test=='QuadOnly':
         mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
         Z = mapping.fit_transform(x)
@@ -178,23 +206,51 @@ def paraCompute(args):
         raise Exception(f"The assigned test type {Test} is not supported")
     
     scaler=StandardScaler()
-    Z = scaler.fit_transform(Z)
+    scaler.fit(Z)
+    Z = scaler.transform(Z)
     D = Z.shape[1]
     Z = Z*1.0/np.sqrt(D)
     print(f'Mapping dimension D is: {D}') 
-    results = getfullComponentPerm(c,Z,y,VarCompEst=True,center=True)
-    
-    if featImp:
-        print(f'Compute the individual level Feature Importance')
-        g, e = results['varcomp'][1], results['varcomp'][2]
-        mu, cov = Bayesian_Posterior(c, Z, y, g, e) # Bayesian_Posterior(X,Z,y,g,e,center=True,full_cov=False):
-        p_values = scipy.stats.norm.sf(abs(mu/cov))*2
-
-        results['Bayesian_mean'] = mu
-        results['Bayesian_std'] = cov
-        results['Bayesian_pval'] = p_values
+    if stage=='test':
+        results = getfullComponentPerm(c,Z,y,VarCompEst=True,center=True)
         
-    return results
+        if featImp:
+            print(f'Compute the individual level Feature Importance')
+            g, e = results['varcomp'][1], results['varcomp'][2]
+            mu, cov = Bayesian_Posterior(c, Z, y, g, e) # Bayesian_Posterior(X,Z,y,g,e,center=True,full_cov=False):
+            p_values = scipy.stats.norm.sf(abs(mu/cov))*2
+
+            results['Bayesian_mean'] = mu
+            results['Bayesian_std'] = cov
+            results['Bayesian_pval'] = p_values
+            
+        return results
+    
+    else:
+        results = {}
+        if mapping is None:
+            Z_test = x_test.copy()
+        else:
+            Z_test = mapping.fit_transform(x_test)
+        Z_test = scaler.transform(Z_test)
+        Z_test = Z_test*1.0/np.sqrt(D)
+        if c.size==0:
+            c = None
+            c_test=None
+        reg, emb_train  = FastKASTRegression(c, Z, Y)
+        reg, emb_test = FastKASTRegression(c_test, Z_test, Y_test,regs=reg)
+        results['emb_train']=emb_train
+        results['emb_test']=emb_test
+        results['reg']=reg
+        return results
+        # def FastKASTRegression(X,
+        #                Z,
+        #                y,
+        #                alphas=[1e-1,1e0,1e1],
+        #                emb_return=True):
+        
+        
+        
 
 
 
@@ -203,12 +259,13 @@ def parseargs():  # handle user arguments
     parser.add_argument('--bfile',
                         required=True,
                         help='Plink bfile base name. Required.')
-    parser.add_argument('--covar',
-                        required=False,
-                        help='Covariate file. Not required')
+    parser.add_argument('--bfileTest',
+                        help='Plink test bfile base name. Required.')
     parser.add_argument('--phen',
                         required=True,
                         help='Phenotype file. Required')
+    parser.add_argument('--phenTest',
+                        help='Phenotype test file. Required')
     parser.add_argument('--thread',
                         type=int,
                         default=1,
@@ -216,6 +273,9 @@ def parseargs():  # handle user arguments
     parser.add_argument('--featImp',
                         action='store_true',
                         help="Compute the feature importance")
+    parser.add_argument('--covar',
+                        action='store_true',
+                        help="whether covar included")
     
     parser.add_argument('--LDthresh',
                         type=float,
@@ -234,10 +294,17 @@ def parseargs():  # handle user arguments
                         help='Prefix for output files.')
     parser.add_argument('--annot', default=None, help='Provided annotation file')
     parser.add_argument('--filename', default='sim', help='output file name')
+    parser.add_argument('--stage',
+                        default='test',
+                        choices=['test', 'infer'],
+                        help="Whether to perform testing or inference")
     parser.add_argument('--test',
                         default='nonlinear',
                         choices=['linear', 'nonlinear', 'general', 'QuadOnly'],
                         help='What type of kernel to test')
+    parser.add_argument('--threshold',
+                        default=5e-6,
+                        type=float)
     args = parser.parse_args()
     return args
 
@@ -252,19 +319,35 @@ if __name__ == "__main__":
     # read genotype data
     savepath = args.output
     LDthresh = args.LDthresh
+    stage = args.stage
     bfile = args.bfile
+    bfile_test = args.bfileTest
+    phen = args.phen
+    covar = args.covar
+    phenTest = args.phenTest
+    threshold = args.threshold
+    
+    if stage == 'infer':
+        assert phenTest is not None and bfile_test is not None 
+        bed_test = bfile_test + '.bed'
+        G_test = open_bed(bed_test)
+    
     bed = bfile + '.bed'
     fam = bfile + '.fam'
     bim = bfile + '.bim'
+    
+    
 
+    
     bimfile = pd.read_csv(bim, delim_whitespace=True, header=None)
     bimfile.columns = ['chr', 'chrpos', 'MAF', 'pos', 'MAJ', 'MIN']
 
-   
-    gene_annot = np.loadtxt(annot_path,ndmin=2)
+    gene_annot = pd.read_csv(annot_path, delimiter=' ')
+    # gene_annot = np.loadtxt(annot_path,ndmin=2)
     print(f'Annotation file contains {gene_annot.shape[1]} sets to be tested')
     
     G = open_bed(bed)
+    
     print('Finish lazy loading the genotype matrix')
 
     
@@ -276,20 +359,33 @@ if __name__ == "__main__":
     Posits = bimfile.iloc[:, 3].values
 
     # prepare covariate
-    covar = args.covar
-    print(f'covar is {covar}')
-    if covar != None:
-        covarfile = pd.read_csv(covar, delim_whitespace=True)
+    if covar:
+        covarfile = pd.read_csv(f'{phen}.covar', delim_whitespace=True)
         assert covarfile.iloc[:, 0].equals(famfile.FID)
         covarfile = covarfile.iloc[:, 2:]
+        
+        if stage=='infer':
+            covarfile_test = pd.read_csv(f'{phen}.covar', delim_whitespace=True)
+            assert covarfile_test.iloc[:, 0].equals(famfile.FID)
+            covarfile_test = covarfile_test.iloc[:, 2:]
 
     print('Finish preparing the indices')
 
-    Y = pd.read_csv(args.phen, delim_whitespace=True).iloc[:, -1].values
+    Y = pd.read_csv(f'{phen}.pheno', delim_whitespace=True).iloc[:, -1].values
     Yeffect = (Y != -9) & (~np.isnan(Y))
     Y = Y[Yeffect]
-    if covar != None:
+    if covar:
         covarfile = covarfile[Yeffect]
+        
+    if stage=='infer':
+        Y_test = pd.read_csv(f'{phenTest}.pheno', delim_whitespace=True).iloc[:, -1].values
+        Yeffect_test = (Y_test != -9) & (~np.isnan(Y_test))
+        Y_test = Y_test[Yeffect_test]
+        if covar:
+            covarfile_test = covarfile_test[Yeffect_test]
+        
+
+        
     print('Finish loading the phenotype matrix')
 
     N = G.shape[0]
@@ -298,15 +394,61 @@ if __name__ == "__main__":
 
     # filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
     filename = args.filename
+    
+    
+    if not os.path.isdir(f'{savepath}'):
+        os.makedirs(f'{savepath}')
+    sig_annot_rows = []
     if args.thread == 1:
         count = 0
-        for colnum in tqdm(range(0, gene_annot.shape[1])):
+        EMB_train = None
+        for rownum in tqdm(range(0, gene_annot.shape[0])):
             count += 1
-            annot_row=gene_annot[:,colnum]
-            results.append(paraCompute(annot_row))
-            dumpfile(results,
-                     savepath,
-                     filename + '_' + str(count) + '.pkl',
-                     overwrite=True)
-            if count > 1:
-                os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
+            annot_row=gene_annot.iloc[rownum]
+            
+            if stage=='test':
+                results.append(paraCompute(annot_row))
+                dumpfile(results,
+                        savepath,
+                        filename + '_' + str(count) + '.pkl',
+                        overwrite=True)
+                if count > 1:
+                    os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
+                
+                
+                print(results[-1]['pval'])
+                pval = results[-1]['pval'][0][0]
+                print(f'pval here is: {pval}')
+                if pval <= threshold:
+                    print(f'significant!')
+                    sig_annot_rows.append([annot_row[0],annot_row[1]])
+                    
+                np.savetxt(f'{savepath}/{filename}_{count}.txt',np.array(sig_annot_rows))
+                if count > 1:
+                    os.remove(savepath + filename + '_' + str(count - 1) + '.txt')  
+                    
+                    
+            else: ## stage == infer
+                
+                result = paraCompute(annot_row)
+                print(result)
+                emb_train, emb_test = result['emb_train'], result['emb_test']
+                emb_train = emb_train.astype(np.float16).reshape(-1,1)
+                emb_test = emb_test.astype(np.float16).reshape(-1,1)
+                if EMB_train is None:
+                    EMB_train = emb_train
+                    EMB_test = emb_test
+                else:
+                    EMB_train = np.concatenate((EMB_train,emb_train),axis=1)
+                    EMB_test = np.concatenate((EMB_test,emb_test),axis=1)
+                    
+                with h5py.File(f'{savepath}/{filename}_train_{count}.h5', 'w') as hdf:
+                    hdf.create_dataset('x', data=EMB_train)
+                
+                with h5py.File(f'{savepath}/{filename}_test_{count}.h5', 'w') as hdf:
+                    hdf.create_dataset('x', data=EMB_train)
+                    
+                if count > 1:
+                    os.remove(f'{savepath}/{filename}_train_{count-1}.h5')  
+                    os.remove(f'{savepath}/{filename}_test_{count-1}.h5')  
+                
