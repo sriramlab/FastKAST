@@ -108,8 +108,10 @@ def paraCompute(args):
                                                         superWindow * wlen)]
                            )  ## 2-G replicate the old conversion scheme
             # c = G[Yeffect, max(0,start-superWindow*wlen):min(G.shape[1],end+superWindow*wlen)].values
-        else:
+        elif Test == 'general':
             c = np.array([])
+        else: ## QuadOnly -- remove additive SNP as fixed effect
+            c = 2 - G.read(index=np.s_[Yeffect, SNP_annot.astype(bool)])
         x = 2 - G.read(index=np.s_[Yeffect, SNP_annot.astype(bool)])
         # x = G[Yeffect, start:end].values
     except Exception as e:
