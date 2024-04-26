@@ -1,4 +1,5 @@
 import os.path
+import joblib
 from joblib import dump, load
 import glob
 import time
@@ -27,6 +28,10 @@ def dumpfile(data, path, filename, overwrite=False):
     else:
         dump(data, filepath)
 
+def resumefile(path, filename):
+    filepath=f'{path}{filename}'
+    data = joblib.load(filepath)
+    return data
 
 def readfiles(rootPath, patternFile):
     traits = []
