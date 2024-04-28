@@ -238,21 +238,10 @@ def paraCompute(args):
             c = None
             c_test=None
 
-        print("SHAPES")
-        print(x.shape)
-        print(x_test.shape)
-        print(c.shape)
-        print(c_test.shape)
-        print(Z.shape)
-        print(Z_test.shape)
-        print(Y.shape)
-        print(Y_test.shape)
         reg, emb_train  = FastKASTRegression(c, Z, Y)
         reg, emb_test = FastKASTRegression(c_test, Z_test, Y_test,regs=reg)
         results['emb_train']=emb_train
         results['emb_test']=emb_test
-        print(emb_train.shape)
-        print(emb_test.shape)
         results['reg']=reg
         return results
         # def FastKASTRegression(X,
@@ -260,9 +249,6 @@ def paraCompute(args):
         #                y,
         #                alphas=[1e-1,1e0,1e1],
         #                emb_return=True):
-        
-        
-        
 
 
 
