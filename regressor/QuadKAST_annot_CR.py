@@ -174,7 +174,7 @@ def paraCompute(args):
         scaler.fit(c)
         c = scaler.transform(c)
         if stage=='infer':
-            c_test = c_test[:,dup_idx]
+            c_test = c_test.iloc[:,dup_idx]
             c_test = impute.transform(c_test)
             c_test = scaler.transform(c_test)
             
@@ -237,10 +237,22 @@ def paraCompute(args):
         if c.size==0:
             c = None
             c_test=None
+
+        print("SHAPES")
+        print(x.shape)
+        print(x_test.shape)
+        print(c.shape)
+        print(c_test.shape)
+        print(Z.shape)
+        print(Z_test.shape)
+        print(Y.shape)
+        print(Y_test.shape)
         reg, emb_train  = FastKASTRegression(c, Z, Y)
         reg, emb_test = FastKASTRegression(c_test, Z_test, Y_test,regs=reg)
         results['emb_train']=emb_train
         results['emb_test']=emb_test
+        print(emb_train.shape)
+        print(emb_test.shape)
         results['reg']=reg
         return results
         # def FastKASTRegression(X,
@@ -342,10 +354,10 @@ if __name__ == "__main__":
     bim = bfile + '.bim'
     
     
-
+    fam_test = bfile_test + '.fam'
     
-    bimfile = pd.read_csv(bim, delim_whitespace=True, header=None)
-    bimfile.columns = ['chr', 'chrpos', 'MAF', 'pos', 'MAJ', 'MIN']
+    # bimfile = pd.read_csv(bim, delim_whitespace=True, header=None)
+    # bimfile.columns = ['chr', 'chrpos', 'MAF', 'pos', 'MAJ', 'MIN']
 
     gene_annot = pd.read_csv(annot_path, delimiter=' ', header=None)
     # gene_annot = np.loadtxt(annot_path,ndmin=2)
@@ -357,11 +369,13 @@ if __name__ == "__main__":
 
     
     famfile = pd.read_csv(fam, delim_whitespace=True, header=None)
+    famfile_test = pd.read_csv(fam_test, delim_whitespace=True, header=None)
     columns = ['FID', 'IID', 'Fa', 'Mo', 'Sex', 'Phi']
     famfile.columns = columns
+    famfile_test.columns = columns
     # in total 22 indices, represent 22 chromosome
     # bimfile = bimfile[bimfile.chr==chrome]
-    Posits = bimfile.iloc[:, 3].values
+    # Posits = bimfile.iloc[:, 3].values
 
     # prepare covariate
     if covar:
@@ -371,7 +385,7 @@ if __name__ == "__main__":
         
         if stage=='infer':
             covarfile_test = pd.read_csv(covarTest, delim_whitespace=True)
-            assert covarfile_test.iloc[:, 0].equals(famfile.FID)
+            assert covarfile_test.iloc[:, 0].equals(famfile_test.FID)
             covarfile_test = covarfile_test.iloc[:, 2:]
 
     print('Finish preparing the indices')
@@ -410,124 +424,101 @@ if __name__ == "__main__":
         count = 0
         resumeFlag=True
         EMB_train = None
-        # for rownum in tqdm(range(0, gene_annot.shape[0])):
-        if len(glob.glob(f'{savepath}{filename}_*.pkl'))>0:
+        if stage=='test':
+            if len(glob.glob(f'{savepath}{filename}_*.pkl'))>0:
+                for rcount, rownum in enumerate(range(start_index,end_index)):
+
+                    count = rcount+1
+                    annot_row=gene_annot.iloc[rownum]
+                    
+                    if ospath.exists(f'{savepath}{filename}_{count}.pkl'):
+                            results = resumefile(savepath,filename+ '_' + str(count) + '.pkl')
+                            resumeFlag=False
+                            print(f'File {savepath}{filename}_{count}.pkl finished, continue')
+                            continue
+                    else:
+                        if resumeFlag:
+                            continue
+                    
+                    print(f'File {savepath}{filename}_{count}.pkl not exist, preceed')
+
+                    if rownum >= gene_annot.shape[0]:
+                        break
+                    
+                    results.append(paraCompute(annot_row))
+                    dumpfile(results,
+                            savepath,
+                            filename + '_' + str(count) + '.pkl',
+                            overwrite=True)
+                    if count > 1:
+                        os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
+                        
+                        
+                    print(results[-1]['pval'])
+                    pval = results[-1]['pval'][0][0]
+                    print(f'pval here is: {pval}')
+                    if pval <= threshold:
+                        print(f'significant!')
+                        sig_annot_rows.append([annot_row[0],annot_row[1]])
+                        
+                    np.savetxt(f'{savepath}/{filename}_{count}.txt',np.array(sig_annot_rows))
+                    if count > 1:
+                        os.remove(savepath + filename + '_' + str(count - 1) + '.txt')
+            else: ## start over
+                for rcount, rownum in enumerate(range(start_index,end_index)):
+                    print(rownum)
+                    count = rcount+1
+                    annot_row=gene_annot.iloc[rownum]
+                    print(f'File {savepath}{filename}_{count}.pkl not exist, start from begining')
+                    print(gene_annot.shape[0])
+                    if rownum >= gene_annot.shape[0]:
+                        break
+                    
+                    results.append(paraCompute(annot_row))
+                    dumpfile(results,
+                            savepath,
+                            filename + '_' + str(count) + '.pkl',
+                            overwrite=True)
+                    if count > 1:
+                        os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
+                    
+                    
+                    print(results[-1]['pval'])
+                    pval = results[-1]['pval'][0][0]
+                    print(f'pval here is: {pval}')
+                    if pval <= threshold:
+                        print(f'significant!')
+                        sig_annot_rows.append([annot_row[0],annot_row[1]])
+                        
+                    np.savetxt(f'{savepath}/{filename}_{count}.txt',np.array(sig_annot_rows))
+                    if count > 1:
+                        os.remove(savepath + filename + '_' + str(count - 1) + '.txt')
+                
+        else: ## stage == infer
             for rcount, rownum in enumerate(range(start_index,end_index)):
-                # count += 1
+
                 count = rcount+1
                 annot_row=gene_annot.iloc[rownum]
-                
-                if ospath.exists(f'{savepath}{filename}_{count}.pkl'):
-                        results = resumefile(savepath,filename+ '_' + str(count) + '.pkl')
-                        resumeFlag=False
-                        print(f'File {savepath}{filename}_{count}.pkl finished, continue')
-                        continue
+                 
+                result = paraCompute(annot_row)
+                print(result)
+                emb_train, emb_test = result['emb_train'], result['emb_test']
+                emb_train = emb_train.astype(np.float16).reshape(-1,1)
+                emb_test = emb_test.astype(np.float16).reshape(-1,1)
+                if EMB_train is None:
+                    EMB_train = emb_train
+                    EMB_test = emb_test
                 else:
-                    if resumeFlag:
-                        continue
+                    EMB_train = np.concatenate((EMB_train,emb_train),axis=1)
+                    EMB_test = np.concatenate((EMB_test,emb_test),axis=1)
+                    
+                with h5py.File(f'{savepath}/{filename}_train_{count}.h5', 'w') as hdf:
+                    hdf.create_dataset('x', data=EMB_train)
                 
-                print(f'File {savepath}{filename}_{count}.pkl not exist, preceed')
-
-                if rownum >= gene_annot.shape[0]:
-                    break
-                
-                if stage=='test':
-                    results.append(paraCompute(annot_row))
-                    dumpfile(results,
-                            savepath,
-                            filename + '_' + str(count) + '.pkl',
-                            overwrite=True)
-                    if count > 1:
-                        os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
+                with h5py.File(f'{savepath}/{filename}_test_{count}.h5', 'w') as hdf:
+                    hdf.create_dataset('x', data=EMB_test)
                     
-                    
-                    print(results[-1]['pval'])
-                    pval = results[-1]['pval'][0][0]
-                    print(f'pval here is: {pval}')
-                    if pval <= threshold:
-                        print(f'significant!')
-                        sig_annot_rows.append([annot_row[0],annot_row[1]])
-                        
-                    np.savetxt(f'{savepath}/{filename}_{count}.txt',np.array(sig_annot_rows))
-                    if count > 1:
-                        os.remove(savepath + filename + '_' + str(count - 1) + '.txt')
-                
-                else: ## stage == infer
-                    
-                    result = paraCompute(annot_row)
-                    print(result)
-                    emb_train, emb_test = result['emb_train'], result['emb_test']
-                    emb_train = emb_train.astype(np.float16).reshape(-1,1)
-                    emb_test = emb_test.astype(np.float16).reshape(-1,1)
-                    if EMB_train is None:
-                        EMB_train = emb_train
-                        EMB_test = emb_test
-                    else:
-                        EMB_train = np.concatenate((EMB_train,emb_train),axis=1)
-                        EMB_test = np.concatenate((EMB_test,emb_test),axis=1)
-                        
-                    with h5py.File(f'{savepath}/{filename}_train_{count}.h5', 'w') as hdf:
-                        hdf.create_dataset('x', data=EMB_train)
-                    
-                    with h5py.File(f'{savepath}/{filename}_test_{count}.h5', 'w') as hdf:
-                        hdf.create_dataset('x', data=EMB_train)
-                        
-                    if count > 1:
-                        os.remove(f'{savepath}/{filename}_train_{count-1}.h5')  
-                        os.remove(f'{savepath}/{filename}_test_{count-1}.h5')
-
-        else: ## start over
-            for rcount, rownum in enumerate(range(start_index,end_index)):
-                print(rownum)
-                count = rcount+1
-                annot_row=gene_annot.iloc[rownum]
-                print(f'File {savepath}{filename}_{count}.pkl not exist, start from begining')
-                print(gene_annot.shape[0])
-                if rownum >= gene_annot.shape[0]:
-                    break
-                
-                if stage=='test':
-                    results.append(paraCompute(annot_row))
-                    dumpfile(results,
-                            savepath,
-                            filename + '_' + str(count) + '.pkl',
-                            overwrite=True)
-                    if count > 1:
-                        os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
-                    
-                    
-                    print(results[-1]['pval'])
-                    pval = results[-1]['pval'][0][0]
-                    print(f'pval here is: {pval}')
-                    if pval <= threshold:
-                        print(f'significant!')
-                        sig_annot_rows.append([annot_row[0],annot_row[1]])
-                        
-                    np.savetxt(f'{savepath}/{filename}_{count}.txt',np.array(sig_annot_rows))
-                    if count > 1:
-                        os.remove(savepath + filename + '_' + str(count - 1) + '.txt')
-                    
-                else: ## stage == infer
-                    
-                    result = paraCompute(annot_row)
-                    print(result)
-                    emb_train, emb_test = result['emb_train'], result['emb_test']
-                    emb_train = emb_train.astype(np.float16).reshape(-1,1)
-                    emb_test = emb_test.astype(np.float16).reshape(-1,1)
-                    if EMB_train is None:
-                        EMB_train = emb_train
-                        EMB_test = emb_test
-                    else:
-                        EMB_train = np.concatenate((EMB_train,emb_train),axis=1)
-                        EMB_test = np.concatenate((EMB_test,emb_test),axis=1)
-                        
-                    with h5py.File(f'{savepath}/{filename}_train_{count}.h5', 'w') as hdf:
-                        hdf.create_dataset('x', data=EMB_train)
-                    
-                    with h5py.File(f'{savepath}/{filename}_test_{count}.h5', 'w') as hdf:
-                        hdf.create_dataset('x', data=EMB_train)
-                        
-                    if count > 1:
-                        os.remove(f'{savepath}/{filename}_train_{count-1}.h5')  
-                        os.remove(f'{savepath}/{filename}_test_{count-1}.h5')  
+                if count > 1:
+                    os.remove(f'{savepath}/{filename}_train_{count-1}.h5')  
+                    os.remove(f'{savepath}/{filename}_test_{count-1}.h5')  
                 
