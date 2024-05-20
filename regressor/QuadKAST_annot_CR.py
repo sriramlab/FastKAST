@@ -188,6 +188,7 @@ def paraCompute(args):
     
     
     mapping = None
+    Zs = []
     if Test=='nonlinear' or Test=='QuadOnly':
         mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
         Z = mapping.fit_transform(x)
@@ -196,59 +197,86 @@ def paraCompute(args):
     elif Test=='linear':
         # mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
         # Z = mapping.fit_transform(x)
-        Z = x.copy()
+        # Z = x.copy()
+
+        if stage == 'test':
+            gammas = [0.001, 0.01, 0.1, 1.0, 10.0]
+            for gamma in gammas:
+                Z = np.sqrt(gamma) * x
+                Zs.append(Z)
 
     elif Test=='general':
         mapping = PolynomialFeatures(degree=2,include_bias=False)
-        Z = mapping.fit_transform(x)
+
+        if stage == 'test':
+            gammas = [0.001, 0.01, 0.1, 1.0, 10.0]
+            for gamma in gammas:
+                x_gamma = np.sqrt(gamma) * x
+                Z = mapping.fit_transform(x_gamma)
+                Zs.append(Z)
+        elif stage == 'infer':
+            print(f'Use sig gamma: {sig_gamma}')
+            x_gamma = np.sqrt(sig_gamma) * x
+            x_gamma_test = np.sqrt(sig_gamma) * x_test
+            Z = mapping.fit_transform(x_gamma)
+            Zs.append(Z)
     
     else:
         raise Exception(f"The assigned test type {Test} is not supported")
     
-    scaler=StandardScaler()
-    scaler.fit(Z)
-    Z = scaler.transform(Z)
-    D = Z.shape[1]
-    Z = Z*1.0/np.sqrt(D)
-    print(f'Mapping dimension D is: {D}') 
-    if stage=='test':
-        results = getfullComponentPerm(c,Z,y,VarCompEst=True,center=True)
-        
-        if featImp:
-            print(f'Compute the individual level Feature Importance')
-            g, e = results['varcomp'][1], results['varcomp'][2]
-            mu, cov = Bayesian_Posterior(c, Z, y, g, e) # Bayesian_Posterior(X,Z,y,g,e,center=True,full_cov=False):
-            p_values = scipy.stats.norm.sf(abs(mu/cov))*2
-
-            results['Bayesian_mean'] = mu
-            results['Bayesian_std'] = cov
-            results['Bayesian_pval'] = p_values
+    all_results = []
+    for Z in Zs:
+        # scaler=StandardScaler()
+        # scaler.fit(Z)
+        # Z = scaler.transform(Z)
+        D = Z.shape[1]
+        # Z = Z*1.0/np.sqrt(D)
+        print(f'Mapping dimension D is: {D}') 
+        if stage=='test':
+            results = getfullComponentPerm(c,Z,y,VarCompEst=False,center=True)
             
-        return results
-    
-    else:
-        results = {}
-        if mapping is None:
-            Z_test = x_test.copy()
-        else:
-            Z_test = mapping.fit_transform(x_test)
-        Z_test = scaler.transform(Z_test)
-        Z_test = Z_test*1.0/np.sqrt(D)
-        if c.size==0:
-            c = None
-            c_test=None
+            featImp = False
+            if featImp:
+                print(f'Compute the individual level Feature Importance')
+                g, e = results['varcomp'][1], results['varcomp'][2]
+                mu, cov = Bayesian_Posterior(c, Z, y, g, e) # Bayesian_Posterior(X,Z,y,g,e,center=True,full_cov=False):
+                p_values = scipy.stats.norm.sf(abs(mu/cov))*2
 
-        reg, emb_train  = FastKASTRegression(c, Z, Y)
-        reg, emb_test = FastKASTRegression(c_test, Z_test, Y_test,regs=reg)
-        results['emb_train']=emb_train
-        results['emb_test']=emb_test
-        results['reg']=reg
-        return results
-        # def FastKASTRegression(X,
-        #                Z,
-        #                y,
-        #                alphas=[1e-1,1e0,1e1],
-        #                emb_return=True):
+                results['Bayesian_mean'] = mu
+                results['Bayesian_std'] = cov
+                results['Bayesian_pval'] = p_values
+                
+            all_results.append(results)
+            # return results
+        
+        else:
+            results = {}
+            if mapping is None:
+                Z_test = x_test.copy()
+            else:
+                Z_test = mapping.fit_transform(x_gamma_test)
+            # Z_test = scaler.transform(Z_test)
+            # Z_test = Z_test*1.0/np.sqrt(D)
+            if c.size==0:
+                c = None
+                c_test=None
+
+            # rbfs = RBFSampler(gamma=sig_gamma, n_components=x_gamma.shape[1]*50, random_state=1)
+            # Z = rbfs.fit_transform(x_gamma)
+            # Z_test = rbfs.fit_transform(x_gamma_test)
+            
+            reg, emb_train  = FastKASTRegression(c, x, Y)
+            reg, emb_test = FastKASTRegression(c_test, x_test, Y_test,regs=reg)
+            results['emb_train']=emb_train
+            results['emb_test']=emb_test
+            results['reg']=reg
+            return results
+            # def FastKASTRegression(X,
+            #                Z,
+            #                y,
+            #                alphas=[1e-1,1e0,1e1],
+            #                emb_return=True):
+    return all_results
 
 
 
@@ -303,6 +331,7 @@ def parseargs():  # handle user arguments
     parser.add_argument('--threshold',
                         default=5e-6,
                         type=float)
+    parser.add_argument('--gammaFile', default=None, help='Significant gammas for inference')
     parser.add_argument('--tindex', required=True, type=int, help='Index used to submit job')
     args = parser.parse_args()
     return args
@@ -329,6 +358,12 @@ if __name__ == "__main__":
     covar = args.covar
     covarTest = args.covarTest
     threshold = args.threshold
+
+    if stage == 'infer':
+        gamma_path = args.gammaFile
+        with open(gamma_path, 'r') as file:
+            lines = file.readlines()
+        sig_gamma = float(lines[tindex].strip())
     
     if stage == 'infer':
         assert phenTest is not None and bfile_test is not None 
@@ -440,10 +475,23 @@ if __name__ == "__main__":
                         os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
                         
                         
-                    print(results[-1]['pval'])
-                    pval = results[-1]['pval'][0][0]
-                    print(f'pval here is: {pval}')
-                    if pval <= threshold:
+                    # print(results[-1]['pval'])
+                    # pval = results[-1]['pval'][0][0]
+                    # print(f'pval here is: {pval}')
+                    # if pval <= threshold:
+                    #     print(f'significant!')
+                    #     sig_annot_rows.append([annot_row[0],annot_row[1]])
+
+                    print(results[-1])
+                    all_pvals = []
+                    for result in results[-1]:
+                        pval = result['pval'][0][0]
+                        all_pvals.append(pval)
+
+                    print(f'pvals are: {all_pvals}')
+                    min_pval = min(all_pvals)
+                    print(f'min pval is: {min_pval}')
+                    if min_pval <= threshold:
                         print(f'significant!')
                         sig_annot_rows.append([annot_row[0],annot_row[1]])
                         
@@ -469,10 +517,23 @@ if __name__ == "__main__":
                         os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
                     
                     
-                    print(results[-1]['pval'])
-                    pval = results[-1]['pval'][0][0]
-                    print(f'pval here is: {pval}')
-                    if pval <= threshold:
+                    # print(results[-1]['pval'])
+                    # pval = results[-1]['pval'][0][0]
+                    # print(f'pval here is: {pval}')
+                    # if pval <= threshold:
+                    #     print(f'significant!')
+                    #     sig_annot_rows.append([annot_row[0],annot_row[1]])
+
+                    print(results[-1])
+                    all_pvals = []
+                    for result in results[-1]:
+                        pval = result['pval'][0][0]
+                        all_pvals.append(pval)
+
+                    print(f'pvals are: {all_pvals}')
+                    min_pval = min(all_pvals)
+                    print(f'min pval is: {min_pval}')
+                    if min_pval <= threshold:
                         print(f'significant!')
                         sig_annot_rows.append([annot_row[0],annot_row[1]])
                         
