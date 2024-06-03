@@ -10,7 +10,7 @@ from numpy.linalg import inv
 import scipy
 
 from scipy.linalg import pinvh
-import fastlmmclib.quadform as qf
+# import fastlmmclib.quadform as qf
 from chi2comb import chi2comb_cdf, ChiSquared
 from sklearn.linear_model import LogisticRegression
 import scipy
@@ -44,7 +44,7 @@ def lik2(param, *args):
           nulity * logdelta) / 2  # The first part of the log likelihood
     sUTy = np.square(UTy)
     if LLadd1 is None:
-        print('operation on L2')
+        # print('operation on L2')
         L2 = (n / 2.0) * np.log(
             (sum(sUTy / (Sii * np.exp(gamma) + np.exp(logdelta)))) / n)
     else:
@@ -164,16 +164,24 @@ def standerr_dev(U, y, Sii, UTy, g, e):
 
 
 def standerr_dev_cov(Sii, yt, LLadd1, n, g, e):
-
+    '''
+    This is the default standard deviation method to use
+    '''
     nulity = max(0, n - len(Sii))
+    # print(f'nulity is {nulity}')
+    # print(f'Sii: {Sii}')
+    # print(f'g: {g}')
+    # print(f'e: {e}')
     L11 = -0.5*(np.sum(np.square(Sii) / np.square(g * Sii + e)))+np.sum(np.square(yt.flatten()) * np.square(Sii) / (g * Sii + e)**3) 
     L22 = -0.5*(np.sum(1. / np.square(g * Sii + e))+nulity*1./e**2) + np.sum(np.square(yt.flatten()) / (g * Sii + e)**3) - np.sum(np.square(yt.flatten())/e**3) +  LLadd1 / e**3
     L12 = -0.5*np.sum(Sii / np.square(g * Sii + e))+np.sum(np.square(yt.flatten()) * Sii / (g * Sii + e)**3)
     # print(np.sum(np.square(UTy.flatten()) * Sii / (g * Sii + e)**3))
     # print(-0.5*np.sum(Sii/(g * Sii + e)**2))
     L = np.array([[L11, L12], [L12, L22]])
+    # print(f'L is:')
     # print(L)
     cov = np.linalg.inv(L)
+    # print(f'Cov is:')
     # print(cov)
     gerr = np.sqrt(cov[0][0])
     eerr = np.sqrt(cov[1][1])
@@ -275,7 +283,7 @@ def VarComponentEst_Cov_std(S, yt, y1, y, dtype='quant'):
     LLadd1 = np.sum(np.square(y))-np.sum(np.square(y1)) ## sum_{i=1}^{N-K} yt_i^2
     
     ytilde_scale = np.sqrt(LLadd1/n)
-    print(f'y tilde std: {ytilde_scale}')
+    # print(f'y tilde std: {ytilde_scale}')
     S = S/ytilde_scale
     yt = yt/ytilde_scale
     
@@ -301,7 +309,7 @@ def VarComponentEst_Cov_std(S, yt, y1, y, dtype='quant'):
     # logdelta = optimizer
     # fun = -1*lik(logdelta, n, S, UTy, LLadd1)
     fun = -1 * optimizer.fun
-
+    
     delta = np.exp(logdelta)
     # h = 1 / (delta + 1)  # heritability
 
@@ -347,7 +355,8 @@ def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
     
     # optimizer = brent(lik, args=(n, S, UTy, LLadd1), brack = (-10, 10))
     t0 = time.time()
-    optimizer = (minimize(lik_cov, [0], args=(n, S, yt, LLadd1), method = 'Nelder-Mead', options={'maxiter':400}))
+    optimizer = (minimize(lik_cov, [0], args=(n, S, yt, LLadd1), method = 'Nelder-Mead', options={'maxiter':5000}))
+    # print(optimizer)
     # optimizer = (minimize(lik, [0],
     #                       args=(n, S, UTy, LLadd1),
     #                       method='L-BFGS-B',
@@ -372,7 +381,7 @@ def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
 
     sq_sigma_g = (sum(np.square(yt.flatten()) / (S+delta)) - sum(np.square(yt.flatten()) / delta)  + LLadd1 / delta) / n
     
-
+    # print(f'delta is: {delta}')
     sq_sigma_e = delta * sq_sigma_g
     time0 = time.time()
     # Sii, yt, LLadd1, n, g, e
@@ -515,30 +524,28 @@ def getfullComponentPerm(X,
     t0 = time.time()
     n = Z.shape[0]
     M = Z.shape[1]
-
+    # print(f'Z here is {np.mean(Z,axis=0)}; {np.std(Z,axis=0)}')
     
     if center:
-        if X is None:
+        if X is None or X.size==0:
             X = np.ones((n, 1))
         else:
             X = np.concatenate((np.ones((n, 1)), X), axis=1)
     y = y.reshape(-1, 1)
-    if X is None:
+    if X is None or X.size==0:
         k = 0
+        Q = np.sum(np.square(y.T @ Z))
+        y1 = y.copy()
     else:
         k = X.shape[1]
+    # yperm = np.random.permutation(y)
+        P1 = inverse(X)
+        # Z = left_projection(Z,X)
+        # Z = projection_QR(Z,X,P1)
+        Z = projection(Z, X, P1)
+        Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z))
         B1, _, _ = numpy_svd(X,compute_uv=True)
         y1 = B1.T@y
-    # yperm = np.random.permutation(y)
-    P1 = inverse(X)
-    start = time.time()
-    t1 = time.time()
-    # print(f'inverse P1 takes {t1-t0}')
-    # S = svd(Z.T@Z-(Z.T@P1)@(X.T@Z),compute_uv=False)
-    t0 = time.time()
-    # Z = left_projection(Z,X)
-    # Z = projection_QR(Z,X,P1)
-    Z = projection(Z, X, P1)
     # Z = Z - X@P1@(X.T@Z)
     t1 = time.time()
     # print(f'Z operation takes {t1-t0}')
@@ -546,11 +553,9 @@ def getfullComponentPerm(X,
         U,S,_ = numpy_svd(Z,compute_uv=True)
     else:
         S = numpy_svd(Z)
-    print(S)
-    print(f'y mean is {np.mean(y)}; std is {np.std(y)}')
     # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
 
-    Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z))
+    
 
     t1 = time.time()
     # print(f'svd takes {t1-t0}')
@@ -565,9 +570,9 @@ def getfullComponentPerm(X,
 
     results = {}
     if VarCompEst:
-        print(U.shape)
+        # print(U.shape)
         U = U[:,filtered]
-        print(U.shape,S.shape)
+        # print(U.shape,S.shape)
         if X is None:
             var_est=VarComponentEst(S,U,y)
         else:
@@ -885,9 +890,8 @@ def Bayesian_Posterior(X,Z,y,g,e,center=True,full_cov=False):
     D = Z.shape[1]
     Z = Z*np.sqrt(D)
     
-
     if center:
-        if X is None:
+        if X is None or X.size==0:
             X = np.ones((n, 1))
         else:
             X = np.concatenate((np.ones((n, 1)), X), axis=1)
@@ -926,7 +930,7 @@ if __name__ == "__main__":
     from sklearn import preprocessing
     from sklearn.kernel_approximation import PolynomialCountSketch
     print(f'Simulating linear effect with h2 = 0.5')
-    for sigma1sq, sigma2sq in [(0.1, 0.5)]:
+    for sigma1sq, sigma2sq in [(0.1, 0.9)]:
         N = 5000
         M = 20
         D = M * 50
@@ -935,7 +939,7 @@ if __name__ == "__main__":
         
 
         mapping = PolynomialFeatures((2, 2),interaction_only=False,include_bias=False)
-        for i in range(3):
+        for i in range(3,6):
             sigmalinsq=0.4
             Z = mapping.fit_transform(X)
             Z = preprocessing.scale(Z)
@@ -955,7 +959,7 @@ if __name__ == "__main__":
             #                          method="Julia")
             # print(f'FastKAST p value is {plist[0][0]}')
             # results = getfullComponentPerm(None,Z*1.0/np.sqrt(Z.shape[1]),y.reshape(1,-1),VarCompEst=True)
-            results = getfullComponentPerm(X,Z*1.0/np.sqrt(Z.shape[1]),y.reshape(1,-1),VarCompEst=True,varCompStd=True)
+            results = getfullComponentPerm(X,Z*1.0/np.sqrt(Z.shape[1]),y.reshape(1,-1),VarCompEst=True,varCompStd=False)
             g, e = results['varcomp'][1], results['varcomp'][2]
             print(f'g_est: {g}; e_est: {e}')
             mu, cov = Bayesian_Posterior(X,Z*1.0/np.sqrt(Z.shape[1]),y,g,e)

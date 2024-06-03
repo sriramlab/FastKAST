@@ -144,13 +144,13 @@ def paraCompute(args):
     x = x[nanfilter]
     y = Y[nanfilter]
     scaler = StandardScaler()
-    t0 = time.time()
-    x = np.unique(x, axis=1, return_index=False)
+    x, x_idx = np.unique(x, axis=1, return_index=True)
+    sort_x_idx = np.argsort(x_idx)
+    x = x[:,sort_x_idx]
     if c.size > 1:
         c = np.unique(c, axis=1, return_index=False)
         c = scaler.fit_transform(c)
     x = scaler.fit_transform(x)
-    t1 = time.time()
     N = x.shape[0]
     print(f'window shape is {x.shape}; covariate shape is {covarfile.shape}; covariate+sw shape is: {c.shape}')
     # y = y_new
