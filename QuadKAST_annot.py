@@ -147,7 +147,11 @@ def paraCompute(args):
     y = Y[nanfilter]
     scaler = StandardScaler()
     t0 = time.time()
-    x = np.unique(x, axis=1, return_index=False)
+    # x = np.unique(x, axis=1, return_index=False)
+    x, x_idx = np.unique(x, axis=1, return_index=True)
+    sort_x_idx = np.argsort(x_idx)
+    x = x[:,sort_x_idx]
+    
     if c.size > 1:
         c = np.unique(c, axis=1, return_index=False)
         c = scaler.fit_transform(c)
