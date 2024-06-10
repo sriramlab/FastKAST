@@ -18,7 +18,7 @@ from bed_reader import open_bed
 import pandas_plink
 from pandas_plink import read_plink1_bin
 from joblib import dump, load
-sys.path.append('/u/home/p/panand2/FastKAST_regressor/')
+sys.path.append('../')
 from utils import *
 from fastmle_res_jax import FastKASTRegression, getfullComponentPerm, Bayesian_Posterior
 

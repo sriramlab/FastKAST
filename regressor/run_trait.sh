@@ -19,14 +19,16 @@ module load anaconda3
 module load plink
 python --version
 
+SGE_TASK_ID=1
+
 basePath=/u/project/sriram/boyang19/Epi/UKBB/train_test_split
 
 trait=Eosinophill_count_30150-0.0
 ofile=testStage_$((SGE_TASK_ID-1))
 
 python QuadKAST_annot_CR.py \
---bfile ${basePath}/train/full_excld_sub_train --bfileTest ${basePath}/train/full_excld_sub_test \
+--bfile ${basePath}/train/full_excld_sub_train --bfileTest ${basePath}/test/full_excld_sub_test \
 --phen ${basePath}/train/pheno/${trait} --phenTest ${basePath}/test/pheno/${trait} \
 --covar ${basePath}/train/pheno/covar.txt.pheno --covarTest ${basePath}/test/pheno/covar.txt.pheno \
---annot /u/scratch/p/panand2/genes.annot --output /u/scratch/p/panand2/FastKAST_regressor/results/${trait}/ \
+--annot /u/scratch/p/panand2/genes.annot --output /u/scratch/b/boyang19/tmp/u/flashscratch/b/boyang19/QuadKAST_emb/real_trait/results/${trait}/ \
 --test general --stage test --filename ${ofile} --tindex ${SGE_TASK_ID}
