@@ -315,6 +315,12 @@ def parseargs():  # handle user arguments
         help=
         'The superwindow is set to a multiple of the set dimension at both ends, default is 2'
     )
+    
+    parser.add_argument('--getPval',
+                        default='regular',
+                        choices=['regular', 'CCT'],
+                        help="How to get p-value from mulitple testing")
+    
     parser.add_argument('--output',
                         default='sim_results',
                         help='Prefix for output files.')
@@ -358,6 +364,7 @@ if __name__ == "__main__":
     covar = args.covar
     covarTest = args.covarTest
     threshold = args.threshold
+    getPval = args.getPval
 
     if stage == 'infer':
         gamma_path = args.gammaFile
@@ -489,7 +496,10 @@ if __name__ == "__main__":
                         all_pvals.append(pval)
 
                     print(f'pvals are: {all_pvals}')
-                    min_pval = min(all_pvals)
+                    if getPval=='regular':
+                        min_pval = min(all_pvals)
+                    elif getPval=='CCT':
+                        min_pval = CCT(np.array(all_pvals))
                     print(f'min pval is: {min_pval}')
                     if min_pval <= threshold:
                         print(f'significant!')
@@ -531,7 +541,12 @@ if __name__ == "__main__":
                         all_pvals.append(pval)
 
                     print(f'pvals are: {all_pvals}')
-                    min_pval = min(all_pvals)
+                    
+                    if getPval=='regular':
+                        min_pval = min(all_pvals)
+                    elif getPval=='CCT':
+                        min_pval = CCT(np.array(all_pvals))
+                        
                     print(f'min pval is: {min_pval}')
                     if min_pval <= threshold:
                         print(f'significant!')

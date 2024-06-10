@@ -30,5 +30,6 @@ python QuadKAST_annot_CR.py \
 --bfile ${basePath}/train/full_excld_sub_train --bfileTest ${basePath}/test/full_excld_sub_test \
 --phen ${basePath}/train/pheno/${trait} --phenTest ${basePath}/test/pheno/${trait} \
 --covar ${basePath}/train/pheno/covar.txt.pheno --covarTest ${basePath}/test/pheno/covar.txt.pheno \
+--getPval 'CCT' \
 --annot /u/scratch/p/panand2/genes.annot --output /u/scratch/b/boyang19/tmp/u/flashscratch/b/boyang19/QuadKAST_emb/real_trait/results/${trait}/ \
 --test general --stage test --filename ${ofile} --tindex ${SGE_TASK_ID}
