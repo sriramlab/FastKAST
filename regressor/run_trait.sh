@@ -18,7 +18,6 @@ module load anaconda3
 module load plink
 python --version
 
-# basePath=/u/project/sriram/boyang19/Epi/UKBB/train_test_split
 basePath=/u/project/sriram/boyang19/Epi/UKBB/unrelWB
 
 trait=urea
@@ -33,5 +32,6 @@ python QuadKAST_annot_CR.py \
 --bfile ${basePath}/train/filter4_train --bfileTest ${basePath}/test/filter4_test \
 --phen ${basePath}/train/pheno_ivrt/${trait} --phenTest ${basePath}/test/pheno_ivrt/${trait} \
 --covar ${basePath}/train/pheno_ivrt/${trait}.covar --covarTest ${basePath}/test/pheno_ivrt/${trait}.covar \
+--getPval 'CCT' \
 --annot ${test_annot} --output /u/scratch/p/panand2/FastKAST_regressor/results/${trait}_hyper_5e-6/ \
 --test general --stage test --filename ${ofile} --tindex ${SGE_TASK_ID}

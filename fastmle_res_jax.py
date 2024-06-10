@@ -11,7 +11,6 @@ from numpy.linalg import inv
 import scipy
 
 from scipy.linalg import pinvh
-import fastlmmclib.quadform as qf
 from chi2comb import chi2comb_cdf, ChiSquared
 from sklearn.linear_model import LogisticRegression
 import scipy
