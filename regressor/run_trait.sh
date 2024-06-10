@@ -1,10 +1,9 @@
 #!/bin/sh
 #$ -cwd
-#$ -l h_data=16G,h_rt=2:00:00
-#$ -e /u/scratch/p/panand2/joblogs/joblog.$JOB_ID
-#$ -o /u/scratch/p/panand2/joblogs/joblog.$JOB_ID
-#$ -N embeddings
-#$ -t 1-10078:1
+#$ -l h_data=16G,h_rt=4:00:00
+#$ -e /u/scratch/p/panand2/joblogs/urea_hyper_5e-6
+#$ -o /u/scratch/p/panand2/joblogs/urea_hyper_5e-6
+#$ -N test
 
 # echo job info on joblog:
 echo "Job $JOB_ID started on:   " `hostname -s`
@@ -19,17 +18,20 @@ module load anaconda3
 module load plink
 python --version
 
-SGE_TASK_ID=1
+basePath=/u/project/sriram/boyang19/Epi/UKBB/unrelWB
 
-basePath=/u/project/sriram/boyang19/Epi/UKBB/train_test_split
+trait=urea
+ofile=testStage$((SGE_TASK_ID-1))
 
-trait=Eosinophill_count_30150-0.0
-ofile=testStage_$((SGE_TASK_ID-1))
+# inference annot path:
+# test_annot=/u/scratch/p/panand2/genes_info_array_full_50_inds
+test_annot=/u/scratch/p/panand2/genes_info_array_50_inds
+inf_annot=/u/scratch/p/panand2/FastKAST_regressor/sig_genes/${trait}.txt
 
 python QuadKAST_annot_CR.py \
---bfile ${basePath}/train/full_excld_sub_train --bfileTest ${basePath}/test/full_excld_sub_test \
---phen ${basePath}/train/pheno/${trait} --phenTest ${basePath}/test/pheno/${trait} \
---covar ${basePath}/train/pheno/covar.txt.pheno --covarTest ${basePath}/test/pheno/covar.txt.pheno \
+--bfile ${basePath}/train/filter4_train --bfileTest ${basePath}/test/filter4_test \
+--phen ${basePath}/train/pheno_ivrt/${trait} --phenTest ${basePath}/test/pheno_ivrt/${trait} \
+--covar ${basePath}/train/pheno_ivrt/${trait}.covar --covarTest ${basePath}/test/pheno_ivrt/${trait}.covar \
 --getPval 'CCT' \
---annot /u/scratch/p/panand2/genes.annot --output /u/scratch/b/boyang19/tmp/u/flashscratch/b/boyang19/QuadKAST_emb/real_trait/results/${trait}/ \
+--annot ${test_annot} --output /u/scratch/p/panand2/FastKAST_regressor/results/${trait}_hyper_5e-6/ \
 --test general --stage test --filename ${ofile} --tindex ${SGE_TASK_ID}

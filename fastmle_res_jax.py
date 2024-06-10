@@ -877,7 +877,7 @@ def getmleComponent(X, K, y, center=False):
 def FastKASTRegression(X,
                        Z,
                        y,
-                       alphas=[1e-1,1e0,1e1],
+                       alphas=[1e-1,1e0,1e1,1e2,1e3,1e4,1e5,1e6],
                        regs=None, ## [covreg, SNPreg]
                        emb_return=True):
     '''
@@ -902,6 +902,7 @@ def FastKASTRegression(X,
         reg = RidgeCV(alphas = alphas)
         reg.fit(Z, y)
         regs['SNPreg'] = reg
+        print(reg.alpha_)
     else:
         reg = regs['SNPreg']
     if emb_return:
