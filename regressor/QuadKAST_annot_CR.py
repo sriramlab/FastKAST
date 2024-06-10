@@ -260,13 +260,9 @@ def paraCompute(args):
             if c.size==0:
                 c = None
                 c_test=None
-
-            # rbfs = RBFSampler(gamma=sig_gamma, n_components=x_gamma.shape[1]*50, random_state=1)
-            # Z = rbfs.fit_transform(x_gamma)
-            # Z_test = rbfs.fit_transform(x_gamma_test)
             
-            reg, emb_train  = FastKASTRegression(c, x, Y)
-            reg, emb_test = FastKASTRegression(c_test, x_test, Y_test,regs=reg)
+            reg, emb_train  = FastKASTRegression(c, Z, Y)
+            reg, emb_test = FastKASTRegression(c_test, Z_test, Y_test,regs=reg)
             results['emb_train']=emb_train
             results['emb_test']=emb_test
             results['reg']=reg
