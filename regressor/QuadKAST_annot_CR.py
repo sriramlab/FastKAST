@@ -22,14 +22,6 @@ sys.path.append('../')
 from utils import *
 from fastmle_res_jax import FastKASTRegression, getfullComponentPerm, Bayesian_Posterior
 
-def CCT(pvals, ws=None):
-    N = len(pvals)
-    if not ws:
-        ws = np.array([1 / N for i in range(N)])
-    T = np.sum(ws * np.tan((0.5 - pvals) * np.pi))
-    pval = 0.5 - np.arctan(T) / np.pi
-    return pval
-
 def LD_estimation(snp1, snps2, DEBUG=False):
     
     nanfilter1 = ~np.isnan(snp1).any(axis=1)
