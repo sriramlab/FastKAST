@@ -60,6 +60,15 @@ def sin_cos(X, method='sin'):
     return results
 
 
+def CCT(pvals, ws=None):
+    N = len(pvals)
+    if not ws:
+        ws = np.array([1 / N for i in range(N)])
+    T = np.sum(ws * np.tan((0.5 - pvals) * np.pi))
+    pval = 0.5 - np.arctan(T) / np.pi
+    return pval
+
+
 class QMC_RFF:
     def __init__(self, gamma, d, n_components, seed=None, QMC='Halton'):
         assert n_components % 2 == 0
