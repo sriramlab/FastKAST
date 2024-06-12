@@ -513,7 +513,7 @@ if __name__ == "__main__":
                         print(f'significant!')
                         sig_annot_rows.append([annot_row[0],annot_row[1]])
                         sig_pvals.append(min_pval)
-                        sig_rows_with_pvalues = np.column_stack((np.array(sig_annot_rows), sig_pvals))
+                        
                         print(f'Generating embedding at {args.output}embeddings/')
                         sig_gamma = gammas[np.argmin(all_pvals)]
                         stage = 'infer'
@@ -523,6 +523,7 @@ if __name__ == "__main__":
                     all_rows.append([annot_row[0],annot_row[1]])
                     pvals.append(min_pval)
 
+                    sig_rows_with_pvalues = np.column_stack((np.array(sig_annot_rows), sig_pvals))
                     all_rows_with_pvalues = np.column_stack((np.array(all_rows), pvals))
                         
                     # Save significant gene annotations
@@ -575,7 +576,6 @@ if __name__ == "__main__":
                         print(f'significant!')
                         sig_annot_rows.append([annot_row[0],annot_row[1]])
                         sig_pvals.append(min_pval)
-                        sig_rows_with_pvalues = np.column_stack((np.array(sig_annot_rows), sig_pvals))
                         print(f'Generating embedding at {args.output}embeddings/')
                         sig_gamma = gammas[np.argmin(all_pvals)]
                         stage = 'infer'
@@ -585,6 +585,7 @@ if __name__ == "__main__":
                     all_rows.append([annot_row[0],annot_row[1]])
                     pvals.append(min_pval)
 
+                    sig_rows_with_pvalues = np.column_stack((np.array(sig_annot_rows), sig_pvals))
                     all_rows_with_pvalues = np.column_stack((np.array(all_rows), pvals))
                         
                     # Save significant gene annotations
