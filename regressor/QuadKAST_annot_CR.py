@@ -22,7 +22,13 @@ sys.path.append('../')
 from utils import *
 from fastmle_res_jax import FastKASTRegression, getfullComponentPerm, Bayesian_Posterior
 
-
+def CCT(pvals, ws=None):
+    N = len(pvals)
+    if not ws:
+        ws = np.array([1 / N for i in range(N)])
+    T = np.sum(ws * np.tan((0.5 - pvals) * np.pi))
+    pval = 0.5 - np.arctan(T) / np.pi
+    return pval
 
 def LD_estimation(snp1, snps2, DEBUG=False):
     
@@ -197,23 +203,17 @@ def paraCompute(args):
     elif Test=='linear':
         # mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
         # Z = mapping.fit_transform(x)
-        # Z = x.copy()
-
-        if stage == 'test':
-            gammas = [0.001, 0.01, 0.1, 1.0, 10.0]
-            for gamma in gammas:
-                Z = np.sqrt(gamma) * x
-                Zs.append(Z)
+        Z = x.copy()
 
     elif Test=='general':
         mapping = PolynomialFeatures(degree=2,include_bias=False)
 
         if stage == 'test':
-            gammas = [0.001, 0.01, 0.1, 1.0, 10.0]
             for gamma in gammas:
                 x_gamma = np.sqrt(gamma) * x
                 Z = mapping.fit_transform(x_gamma)
                 Zs.append(Z)
+
         elif stage == 'infer':
             print(f'Use sig gamma: {sig_gamma}')
             x_gamma = np.sqrt(sig_gamma) * x
@@ -233,7 +233,7 @@ def paraCompute(args):
         # Z = Z*1.0/np.sqrt(D)
         print(f'Mapping dimension D is: {D}') 
         if stage=='test':
-            results = getfullComponentPerm(c,Z,y,VarCompEst=False,center=True)
+            results = getfullComponentPerm(c,Z,y,Perm=0,VarCompEst=False,center=True)
             
             featImp = False
             if featImp:
@@ -274,6 +274,30 @@ def paraCompute(args):
             #                emb_return=True):
     return all_results
 
+def generate_embedding(annot_row, savepath, filename, EMB_train):
+                 
+    if not os.path.isdir(f'{savepath}'):
+        os.makedirs(f'{savepath}')
+        
+    print(f"Embedding for annot: {annot_row}")
+
+    result = paraCompute(annot_row)
+    print(result)
+    emb_train, emb_test = result['emb_train'], result['emb_test']
+    emb_train = emb_train.astype(np.float16).reshape(-1,1)
+    emb_test = emb_test.astype(np.float16).reshape(-1,1)
+    if EMB_train is None:
+        EMB_train = emb_train
+        EMB_test = emb_test
+    else:
+        EMB_train = np.concatenate((EMB_train,emb_train),axis=1)
+        EMB_test = np.concatenate((EMB_test,emb_test),axis=1)
+        
+    with h5py.File(f'{savepath}/{filename}_train.h5', 'w') as hdf:
+        hdf.create_dataset('x', data=EMB_train)
+    
+    with h5py.File(f'{savepath}/{filename}_test.h5', 'w') as hdf:
+        hdf.create_dataset('x', data=EMB_test)
 
 
 def parseargs():  # handle user arguments
@@ -333,16 +357,21 @@ def parseargs():  # handle user arguments
     parser.add_argument('--threshold',
                         default=5e-6,
                         type=float)
-    parser.add_argument('--gammaFile', default=None, help='Significant gammas for inference')
+    parser.add_argument('--gammas',
+                        default=[0.001, 0.01, 0.1, 1.0, 10.0],
+                        type=float, 
+                        nargs='+',
+                        help='Gamma values for kernel hyperparameter search')
+    parser.add_argument('--CR', required=False, type=int, default=50, help='Split jobs')
     parser.add_argument('--tindex', required=True, type=int, help='Index used to submit job')
     args = parser.parse_args()
     return args
 
 
 if __name__ == "__main__":
-    CR = 1
 
     args = parseargs()
+    CR = args.CR
     Test = args.test
     tindex = args.tindex-1
     # set parameters
@@ -362,21 +391,15 @@ if __name__ == "__main__":
     threshold = args.threshold
     getPval = args.getPval
 
-    if stage == 'infer':
-        gamma_path = args.gammaFile
-        with open(gamma_path, 'r') as file:
-            lines = file.readlines()
-        sig_gamma = float(lines[tindex].strip())
+    gammas = args.gammas
     
-    if stage == 'infer':
-        assert phenTest is not None and bfile_test is not None 
-        bed_test = bfile_test + '.bed'
-        G_test = open_bed(bed_test)
+    assert phenTest is not None and bfile_test is not None 
+    bed_test = bfile_test + '.bed'
+    G_test = open_bed(bed_test)
     
     bed = bfile + '.bed'
     fam = bfile + '.fam'
     bim = bfile + '.bim'
-    
     
     fam_test = bfile_test + '.fam'
     
@@ -407,10 +430,9 @@ if __name__ == "__main__":
         assert covarfile.iloc[:, 0].equals(famfile.FID)
         covarfile = covarfile.iloc[:, 2:]
         
-        if stage=='infer':
-            covarfile_test = pd.read_csv(covarTest, delim_whitespace=True)
-            assert covarfile_test.iloc[:, 0].equals(famfile_test.FID)
-            covarfile_test = covarfile_test.iloc[:, 2:]
+        covarfile_test = pd.read_csv(covarTest, delim_whitespace=True)
+        assert covarfile_test.iloc[:, 0].equals(famfile_test.FID)
+        covarfile_test = covarfile_test.iloc[:, 2:]
 
     print('Finish preparing the indices')
     start_index = int(tindex*CR)
@@ -422,14 +444,12 @@ if __name__ == "__main__":
     if covar:
         covarfile = covarfile[Yeffect]
         
-    if stage=='infer':
-        Y_test = pd.read_csv(f'{phenTest}.pheno', delim_whitespace=True).iloc[:, -1].values
-        Yeffect_test = (Y_test != -9) & (~np.isnan(Y_test))
-        Y_test = Y_test[Yeffect_test]
-        if covar:
-            covarfile_test = covarfile_test[Yeffect_test]
-        
-
+    Y_test = pd.read_csv(f'{phenTest}.pheno', delim_whitespace=True).iloc[:, -1].values
+    Yeffect_test = (Y_test != -9) & (~np.isnan(Y_test))
+    Y_test = Y_test[Yeffect_test]
+    if covar:
+        covarfile_test = covarfile_test[Yeffect_test]
+    
         
     print('Finish loading the phenotype matrix')
 
@@ -439,18 +459,23 @@ if __name__ == "__main__":
 
     # filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
     filename = args.filename
-    
-    
     if not os.path.isdir(f'{savepath}'):
         os.makedirs(f'{savepath}')
+
     sig_annot_rows = []
+    sig_pvals = []
+    all_rows = []
+    pvals = []
     if args.thread == 1:
         count = 0
         resumeFlag=True
         EMB_train = None
         if stage=='test':
+
             if len(glob.glob(f'{savepath}{filename}_*.pkl'))>0:
                 for rcount, rownum in enumerate(range(start_index,end_index)):
+
+                    sig_gamma = None
 
                     count = rcount+1
                     annot_row=gene_annot.iloc[rownum]
@@ -464,7 +489,7 @@ if __name__ == "__main__":
                         if resumeFlag:
                             continue
                     
-                    print(f'File {savepath}{filename}_{count}.pkl not exist, preceed')
+                    print(f'File {savepath}{filename}_{count}.pkl does not exist, proceed')
 
                     if rownum >= gene_annot.shape[0]:
                         break
@@ -477,18 +502,11 @@ if __name__ == "__main__":
                     if count > 1:
                         os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
                         
-                        
-                    # print(results[-1]['pval'])
-                    # pval = results[-1]['pval'][0][0]
-                    # print(f'pval here is: {pval}')
-                    # if pval <= threshold:
-                    #     print(f'significant!')
-                    #     sig_annot_rows.append([annot_row[0],annot_row[1]])
 
                     print(results[-1])
                     all_pvals = []
                     for result in results[-1]:
-                        pval = result['pval'][0][0]
+                        pval = result['pval'][0]
                         all_pvals.append(pval)
 
                     print(f'pvals are: {all_pvals}')
@@ -496,20 +514,44 @@ if __name__ == "__main__":
                         min_pval = min(all_pvals)
                     elif getPval=='CCT':
                         min_pval = CCT(np.array(all_pvals))
+
+
                     print(f'min pval is: {min_pval}')
                     if min_pval <= threshold:
                         print(f'significant!')
                         sig_annot_rows.append([annot_row[0],annot_row[1]])
+                        sig_pvals.append(min_pval)
+                        sig_rows_with_pvalues = np.column_stack((np.array(sig_annot_rows), sig_pvals))
+                        print(f'Generating embedding at {args.output}embeddings/')
+                        sig_gamma = gammas[np.argmin(all_pvals)]
+                        stage = 'infer'
+                        generate_embedding(annot_row, savepath=args.output+'embeddings', filename=f'gene_idx_{tindex*50 + count - 1}', EMB_train=EMB_train)
+                        stage = 'test'
+
+                    all_rows.append([annot_row[0],annot_row[1]])
+                    pvals.append(min_pval)
+
+                    all_rows_with_pvalues = np.column_stack((np.array(all_rows), pvals))
                         
-                    np.savetxt(f'{savepath}/{filename}_{count}.txt',np.array(sig_annot_rows))
+                    # Save significant gene annotations
+                    np.savetxt(f'{savepath}/{filename}_{count}_sig.txt',np.array(sig_rows_with_pvalues))
                     if count > 1:
-                        os.remove(savepath + filename + '_' + str(count - 1) + '.txt')
+                        os.remove(savepath + filename + '_' + str(count - 1) + '_sig.txt')
+
+                    # Save all annotations and their associated p-values
+                    np.savetxt(f'{savepath}/{filename}_{count}_all.txt',np.array(all_rows_with_pvalues))
+                    if count > 1:
+                        os.remove(savepath + filename + '_' + str(count - 1) + '_all.txt')
+
             else: ## start over
                 for rcount, rownum in enumerate(range(start_index,end_index)):
                     print(rownum)
+
+                    sig_gamma = None
+
                     count = rcount+1
                     annot_row=gene_annot.iloc[rownum]
-                    print(f'File {savepath}{filename}_{count}.pkl not exist, start from begining')
+                    print(f'File {savepath}{filename}_{count}.pkl does not exist, starting from beginning')
                     print(gene_annot.shape[0])
                     if rownum >= gene_annot.shape[0]:
                         break
@@ -521,19 +563,12 @@ if __name__ == "__main__":
                             overwrite=True)
                     if count > 1:
                         os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
-                    
-                    
-                    # print(results[-1]['pval'])
-                    # pval = results[-1]['pval'][0][0]
-                    # print(f'pval here is: {pval}')
-                    # if pval <= threshold:
-                    #     print(f'significant!')
-                    #     sig_annot_rows.append([annot_row[0],annot_row[1]])
+            
 
                     print(results[-1])
                     all_pvals = []
                     for result in results[-1]:
-                        pval = result['pval'][0][0]
+                        pval = result['pval'][0]
                         all_pvals.append(pval)
 
                     print(f'pvals are: {all_pvals}')
@@ -547,36 +582,26 @@ if __name__ == "__main__":
                     if min_pval <= threshold:
                         print(f'significant!')
                         sig_annot_rows.append([annot_row[0],annot_row[1]])
-                        
-                    np.savetxt(f'{savepath}/{filename}_{count}.txt',np.array(sig_annot_rows))
-                    if count > 1:
-                        os.remove(savepath + filename + '_' + str(count - 1) + '.txt')
-                
-        else: ## stage == infer
-            for rcount, rownum in enumerate(range(start_index,end_index)):
+                        sig_pvals.append(min_pval)
+                        sig_rows_with_pvalues = np.column_stack((np.array(sig_annot_rows), sig_pvals))
+                        print(f'Generating embedding at {args.output}embeddings/')
+                        sig_gamma = gammas[np.argmin(all_pvals)]
+                        stage = 'infer'
+                        generate_embedding(annot_row, savepath=args.output+'embeddings', filename=f'gene_idx_{tindex*50 + count - 1}', EMB_train=EMB_train)
+                        stage = 'test'
 
-                count = rcount+1
-                annot_row=gene_annot.iloc[rownum]
-                 
-                result = paraCompute(annot_row)
-                print(result)
-                emb_train, emb_test = result['emb_train'], result['emb_test']
-                emb_train = emb_train.astype(np.float16).reshape(-1,1)
-                emb_test = emb_test.astype(np.float16).reshape(-1,1)
-                if EMB_train is None:
-                    EMB_train = emb_train
-                    EMB_test = emb_test
-                else:
-                    EMB_train = np.concatenate((EMB_train,emb_train),axis=1)
-                    EMB_test = np.concatenate((EMB_test,emb_test),axis=1)
-                    
-                with h5py.File(f'{savepath}/{filename}_train_{count}.h5', 'w') as hdf:
-                    hdf.create_dataset('x', data=EMB_train)
-                
-                with h5py.File(f'{savepath}/{filename}_test_{count}.h5', 'w') as hdf:
-                    hdf.create_dataset('x', data=EMB_test)
-                    
-                if count > 1:
-                    os.remove(f'{savepath}/{filename}_train_{count-1}.h5')  
-                    os.remove(f'{savepath}/{filename}_test_{count-1}.h5')  
+                    all_rows.append([annot_row[0],annot_row[1]])
+                    pvals.append(min_pval)
+
+                    all_rows_with_pvalues = np.column_stack((np.array(all_rows), pvals))
+                        
+                    # Save significant gene annotations
+                    np.savetxt(f'{savepath}/{filename}_{count}_sig.txt',np.array(sig_rows_with_pvalues))
+                    if count > 1:
+                        os.remove(savepath + filename + '_' + str(count - 1) + '_sig.txt')
+
+                    # Save all annotations and their associated p-values
+                    np.savetxt(f'{savepath}/{filename}_{count}_all.txt',np.array(all_rows_with_pvalues))
+                    if count > 1:
+                        os.remove(savepath + filename + '_' + str(count - 1) + '_all.txt')
                 
