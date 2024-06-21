@@ -51,7 +51,9 @@ def LD_estimation(snp1, snps2, DEBUG=False):
 
 
 def paraCompute(args):
+    print(f'args: {args}')
     start_index, end_index = args
+    print(f'start: {start_index}; end: {end_index}')
     if end_index-start_index <=3:
         print(f'Warning: target window size too small, numerical issue may encounter')
     M = G.shape[1]
@@ -179,7 +181,7 @@ def paraCompute(args):
     
     t1 = time.time()
     N = x.shape[0]
-    print(f'window shape is {x.shape}; covariate+sw shape is: {c.shape}')
+    # print(f'window shape is {x.shape}; covariate+sw shape is: {c.shape}')
     # y = y_new
     # for hyperparameter selection, simply replace the following list with a list of gamma values
     t0 = time.time()
@@ -188,8 +190,21 @@ def paraCompute(args):
     mapping = None
     Zs = []
     if Test=='nonlinear' or Test=='QuadOnly':
-        mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
+        mapping = PolynomialFeatures((2, 2),interaction_only=inter_only,include_bias=False)
         Z = mapping.fit_transform(x)
+        
+        if stage == 'test':
+            for gamma in gammas:
+                x_gamma = np.sqrt(gamma) * x
+                Z = mapping.fit_transform(x_gamma)
+                Zs.append(Z)
+                
+        elif stage == 'infer':
+            print(f'Use sig gamma: {sig_gamma}')
+            x_gamma = np.sqrt(sig_gamma) * x
+            x_gamma_test = np.sqrt(sig_gamma) * x_test
+            Z = mapping.fit_transform(x_gamma)
+            Zs.append(Z)
         # Z = direct(x)
         
     elif Test=='linear':
@@ -237,7 +252,8 @@ def paraCompute(args):
                 results['Bayesian_mean'] = mu
                 results['Bayesian_std'] = cov
                 results['Bayesian_pval'] = p_values
-                
+            # print(f'c: {c.shape}; Z: {Z.shpae}; y: {y.shpae}')
+            print(f'results is {results}')
             all_results.append(results)
             # return results
         
@@ -350,10 +366,13 @@ def parseargs():  # handle user arguments
                         default=5e-6,
                         type=float)
     parser.add_argument('--gammas',
-                        default=[0.001, 0.01, 0.1, 1.0, 10.0],
+                        default=[1.0],
                         type=float, 
                         nargs='+',
                         help='Gamma values for kernel hyperparameter search')
+    parser.add_argument('--inter_only',
+                        action='store_true',
+                        help="Test only the interaction?")
     parser.add_argument('--CR', required=False, type=int, default=50, help='Split jobs')
     parser.add_argument('--tindex', required=True, type=int, help='Index used to submit job')
     args = parser.parse_args()
@@ -365,6 +384,7 @@ if __name__ == "__main__":
     args = parseargs()
     CR = args.CR
     Test = args.test
+    inter_only = args.inter_only
     tindex = args.tindex-1
     # set parameters
     superWindow = args.sw
@@ -470,7 +490,9 @@ if __name__ == "__main__":
                     sig_gamma = None
 
                     count = rcount+1
-                    annot_row=gene_annot.iloc[rownum]
+                    annot_row=gene_annot.iloc[rownum].values
+                    print(f'###### annot_row ######')
+                    print(annot_row)
                     
                     if ospath.exists(f'{savepath}{filename}_{count}.pkl'):
                             results = resumefile(savepath,filename+ '_' + str(count) + '.pkl')
