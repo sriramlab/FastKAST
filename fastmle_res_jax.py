@@ -8,9 +8,9 @@ from scipy.linalg import svd
 import time
 from numpy.linalg import inv
 import scipy
-
+from tqdm import tqdm
 from scipy.linalg import pinvh
-# import fastlmmclib.quadform as qf
+import fastlmmclib.quadform as qf
 from chi2comb import chi2comb_cdf, ChiSquared
 from sklearn.linear_model import LogisticRegression
 import scipy
@@ -65,7 +65,7 @@ def score_test(S):
     return (1 - p, error)
 
 
-def score_test2(sq_sigma_e0, Q, S, decompose=True, center=False, multi=False, DEBUG=True):
+def score_test2(sq_sigma_e0, Q, S, decompose=True, center=False, multi=False, DEBUG=False):
     k = len(S)
     Phi = np.zeros(k)
     Phi[0:len(S)] = S
@@ -73,14 +73,12 @@ def score_test2(sq_sigma_e0, Q, S, decompose=True, center=False, multi=False, DE
     dofs = np.ones(k)
     ncents = np.zeros(k)
     chi2s = [ChiSquared(Phi[i], ncents[i], dofs[i]) for i in range(k)]
-    print(f'Qe is {Qe}')
-    print(f'chi2s is {chi2s}')
     # t0 = time.time()
     if multi:
         ps=[]
         errors=[]
         infos=[]
-        for K in range(len(Qe)):
+        for K in tqdm(range(len(Qe)),desc="Processing score statistics"):
             p, error, info = chi2comb_cdf(Qe[K], chi2s, 0, lim=int(1e8), atol=1e-13)
             ps.append(p)
             errors.append(error)
@@ -90,18 +88,28 @@ def score_test2(sq_sigma_e0, Q, S, decompose=True, center=False, multi=False, DE
         ps = np.array(ps)
         return (1-ps, errors)
     else:
-        p, error, info = chi2comb_cdf(Qe, chi2s, 0, lim=int(1e9), atol=1e-13)
+        p, error, info = chi2comb_cdf(Qe, chi2s, 0, lim=int(1e8), atol=1e-13)
         if DEBUG:
             print(info)
         # p = qf.qf(0, Phi, acc = 1e-7)[0]
         # t1 = time.time()
         return (1 - p, error)
 
-def score_test_qf(sq_sigma_e0, Q, S, decompose=True, center=False):
-    Qe = float(Q / (sq_sigma_e0))
-    stats=qf.qf(Qe, S,sigma=1,lim=int(1e8),acc = 1e-15)
-    p = stats[0]
-    return (p)
+def score_test_qf(sq_sigma_e0, Q, S, decompose=True, center=False,multi=False):
+    Qe = (Q / (sq_sigma_e0))
+    if multi:
+        ps=[]
+        for K in tqdm(range(len(Qe)),desc="Processing score statistics"):
+            stats=qf.qf(Qe[K], S,sigma=1,lim=int(1e8),acc = 1e-15)
+            p = stats[0]
+            ps.append(p)
+        ps = np.array(ps)
+        return (ps,'NaN')
+    else:
+        stats=qf.qf(Qe, S,sigma=1,lim=int(1e8),acc = 1e-15)
+        p = stats[0]
+            
+        return (p,'NaN')
 
 
 def lik(logdelta, *args):
@@ -743,7 +751,7 @@ def getfullComponentMulti(X,
         sigma2_e=var_est[2]
         trace=np.sum(S) # compute the trace of phi phi.T
         sumK = np.sum(np.sum(Z,axis=0)**2) # compute the sum(Phi Phi.T)
-        print(f'trace is {trace}; sum K is {sumK}')
+        # print(f'trace is {trace}; sum K is {sumK}')
         results['varcomp']=var_est
         print(f'Var est is: \n {var_est}')
     t0 = time.time()
@@ -763,14 +771,14 @@ def getfullComponentMulti(X,
         sq_sigma_e0_num=np.sum(y*y,axis=0) - np.sum(yTXPX*(y.T),axis=1)
         sq_sigma_e0_den=(n-k-nan_num) 
         sq_sigma_e0 = sq_sigma_e0_num / sq_sigma_e0_den ## K vector
-        print(f'sq_sigma_e0: {sq_sigma_e0}')
+        # print(f'sq_sigma_e0: {sq_sigma_e0}')
         # sq_sigma_e0_perm = (yperm.T@yperm - yperm.T@X@P1@(X.T@yperm))[0]/(n-k)
     else:
         sq_sigma_e0 = np.sum(y*y,axis=0) / (n-nan_num) ## K vector
     # t0 = time.time()
     # print(f'Y is {y}, {np.sum(y)}')
-    
-    p_value1 = score_test2(sq_sigma_e0, Q, S, center=center,multi=True)
+    p_value1=score_test_qf(sq_sigma_e0, Q, S, center=center,multi=True)
+    # p_value1 = score_test2(sq_sigma_e0, Q, S, center=center,multi=True)
     print(f'pval is {p_value1}')
     if Perm:
         print(f'Perm not implement yet')
