@@ -65,7 +65,7 @@ def score_test(S):
     return (1 - p, error)
 
 
-def score_test2(sq_sigma_e0, Q, S, decompose=True, center=False):
+def score_test2(sq_sigma_e0, Q, S, decompose=True, center=False, multi=False, DEBUG=True):
     k = len(S)
     Phi = np.zeros(k)
     Phi[0:len(S)] = S
@@ -73,11 +73,29 @@ def score_test2(sq_sigma_e0, Q, S, decompose=True, center=False):
     dofs = np.ones(k)
     ncents = np.zeros(k)
     chi2s = [ChiSquared(Phi[i], ncents[i], dofs[i]) for i in range(k)]
-    t0 = time.time()
-    p, error, info = chi2comb_cdf(Qe, chi2s, 0, lim=int(1e9), atol=1e-13)
-    # p = qf.qf(0, Phi, acc = 1e-7)[0]
-    t1 = time.time()
-    return (1 - p, error)
+    print(f'Qe is {Qe}')
+    print(f'chi2s is {chi2s}')
+    # t0 = time.time()
+    if multi:
+        ps=[]
+        errors=[]
+        infos=[]
+        for K in range(len(Qe)):
+            p, error, info = chi2comb_cdf(Qe[K], chi2s, 0, lim=int(1e8), atol=1e-13)
+            ps.append(p)
+            errors.append(error)
+            infos.append(info)
+        if DEBUG:
+            print(infos)
+        ps = np.array(ps)
+        return (1-ps, errors)
+    else:
+        p, error, info = chi2comb_cdf(Qe, chi2s, 0, lim=int(1e9), atol=1e-13)
+        if DEBUG:
+            print(info)
+        # p = qf.qf(0, Phi, acc = 1e-7)[0]
+        # t1 = time.time()
+        return (1 - p, error)
 
 def score_test_qf(sq_sigma_e0, Q, S, decompose=True, center=False):
     Qe = float(Q / (sq_sigma_e0))
@@ -555,8 +573,6 @@ def getfullComponentPerm(X,
         S = numpy_svd(Z)
     # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
 
-    
-
     t1 = time.time()
     # print(f'svd takes {t1-t0}')
     # t0 = time.time()
@@ -634,6 +650,146 @@ def getfullComponentPerm(X,
         results['pval']=p_list
         return results
     results['pval']=p_value1
+    return results
+
+
+
+def getfullComponentMulti(X,
+                         Z,
+                         y,
+                         theta=False,
+                         dtype='quant',
+                         center=True,
+                         method='Numpy',
+                         Perm=10,
+                         Test='nonlinear',
+                         VarCompEst=False,
+                         varCompStd=False):
+    '''
+    This function provide a multi-trait version for QuadKAST computation.
+    Detailed processing scheme
+        1. Trait missing value will be masked
+        2. Effective sample size N varies trait by trait
+    Input:
+        y: N x K (K: number of traits to test)
+        X: covariates
+        Z: (transformed) genotype matrix
+    '''
+    # X is the covariates that need to be regressed out, res is the residule after regressing out the linear effect
+    # delta is the initial guess of delta value
+    t0 = time.time()
+    n = Z.shape[0]
+    M = Z.shape[1]
+    # print(f'Z here is {np.mean(Z,axis=0)}; {np.std(Z,axis=0)}')
+    nan_num = np.sum(np.isnan(y),axis=0)
+    print(f'nan_num is {nan_num}')
+    y = np.nan_to_num(y)
+    if center:
+        if X is None or X.size==0:
+            X = np.ones((n, 1))
+        else:
+            X = np.concatenate((np.ones((n, 1)), X), axis=1)
+    
+    if X is None or X.size==0:
+        k = 0
+        Q = np.sum(np.square(y.T @ Z),axis=1) ## K vector 
+        y1 = y.copy()
+    else:
+        k = X.shape[1]
+    # yperm = np.random.permutation(y)
+        P1 = inverse(X)
+        # Z = left_projection(Z,X)
+        # Z = projection_QR(Z,X,P1)
+        Z = projection(Z, X, P1)
+        Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z),axis=1) ## K vector
+        B1, _, _ = numpy_svd(X,compute_uv=True) ## N_eff x N
+        y1 = B1.T@y ## N_eff x K
+    # Z = Z - X@P1@(X.T@Z)
+    t1 = time.time()
+    # print(f'Z operation takes {t1-t0}')
+    if VarCompEst:
+        U,S,_ = numpy_svd(Z,compute_uv=True)
+    else:
+        S = numpy_svd(Z)
+    # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
+
+    t1 = time.time()
+    # print(f'svd takes {t1-t0}')
+    # t0 = time.time()
+
+    # Q_perm = np.sum(np.square(yperm.T@Z - yperm.T@X@P1@X.T@Z))
+    # t1 = time.time()
+    S = np.square(S)
+    S[S <= 1e-6] = 0
+    filtered=np.nonzero(S)[0]
+    S = S[filtered]
+
+    results = {}
+    if VarCompEst:
+        print(f'Var comp for multi-trait version hasnt implemented yet')
+        # print(U.shape)
+        U = U[:,filtered]
+        # print(U.shape,S.shape)
+        if X is None:
+            var_est=VarComponentEst(S,U,y)
+        else:
+            yt = U.T@y
+            if varCompStd:
+                # standardized hertability for sigma_quad^2
+                var_est=VarComponentEst_Cov_std(S,yt,y1,y) # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'): Don't use this version unless you know what you are doing
+            else:
+                var_est=VarComponentEst_Cov(S,yt,y1,y) # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
+        sigma2_gxg=var_est[1]
+        sigma2_e=var_est[2]
+        trace=np.sum(S) # compute the trace of phi phi.T
+        sumK = np.sum(np.sum(Z,axis=0)**2) # compute the sum(Phi Phi.T)
+        print(f'trace is {trace}; sum K is {sumK}')
+        results['varcomp']=var_est
+        print(f'Var est is: \n {var_est}')
+    t0 = time.time()
+    #     S = np.square(SVD[1])
+    ts0 = time.time()
+    
+    # print(f'S raw is {S}')
+    
+    ts1 = time.time()
+    # k = int(np.sum(inner1d(P1,X)))
+    t1 = time.time()
+    
+    if center:
+        # print('calculate centered y')
+        # sq_sigma_e0 = (y.T @ y - y.T @ X @ P1 @ (X.T @ y))[0] / (n - k)
+        yTXPX = y.T @ X @ P1 @ X.T
+        sq_sigma_e0_num=np.sum(y*y,axis=0) - np.sum(yTXPX*(y.T),axis=1)
+        sq_sigma_e0_den=(n-k-nan_num) 
+        sq_sigma_e0 = sq_sigma_e0_num / sq_sigma_e0_den ## K vector
+        print(f'sq_sigma_e0: {sq_sigma_e0}')
+        # sq_sigma_e0_perm = (yperm.T@yperm - yperm.T@X@P1@(X.T@yperm))[0]/(n-k)
+    else:
+        sq_sigma_e0 = np.sum(y*y,axis=0) / (n-nan_num) ## K vector
+    # t0 = time.time()
+    # print(f'Y is {y}, {np.sum(y)}')
+    
+    p_value1 = score_test2(sq_sigma_e0, Q, S, center=center,multi=True)
+    print(f'pval is {p_value1}')
+    if Perm:
+        print(f'Perm not implement yet')
+        pass
+        # p_list = [p_value1]
+        # for state in range(Perm):
+        #     shuff_idx = np.random.RandomState(seed=state).permutation(n)
+        #     yperm = (y - (X @ (P1 @ (X.T @ y))))[shuff_idx]
+        #     Qperm = np.sum(np.square(yperm.T @ Z))
+        #     sq_sigma_e0_perm = (yperm.T @ yperm)[0] / (n - k)
+        #     p_value1_perm = score_test2(sq_sigma_e0_perm,
+        #                                 Qperm,
+        #                                 S,
+        #                                 center=center)
+        #     p_list.append(p_value1_perm)
+
+        # results['pval']=p_list
+        # return results
+    results['pvals']=p_value1 ## notice the key name change here
     return results
 
 
