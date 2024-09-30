@@ -1,9 +1,0 @@
-array_quad_sum.csv: stats for array dataset
-imp_quad_sum.csv: stats for imputed datatset
-
-Fields: 	
-#SNPs: number of effective SNPs in array data
-#interaction: number of interactive terms
-var_quad: variance component analysis for quadratic effect
-pvals_score: pvalue acquaired from score statistics
-pvals_wald: pvalue acquaired from the wald test using z score
