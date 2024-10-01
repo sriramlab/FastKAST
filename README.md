@@ -5,6 +5,8 @@
 
 This folder has been updated with both the [FastKAST](https://www.nature.com/articles/s41467-023-40346-2) and [QuadKAST](https://genome.cshlp.org/content/early/2024/08/29/gr.279140.124)
 
+Please check sub-branch for detailed instruction on each specific method. 
+
 
 ## Requirements
 1. You need python >= 3.60 in order to run the code (anaconda3 recommended)
@@ -28,8 +30,10 @@ python QuadKAST_annot.py --bfile ./example/sim --phen ./example/sim.pheno --anno
 ```
 Or directly run
 ```
-sh run_rbf_annot.sh
+sh run_quad_annot.sh
 ```
 
 ## Data availability
 The detailed statistics used to generate the main table and the Venn diagram of the paper are provided in the `Data` folder
+
+✅ Efficient multi-traits analysis (Sep 30, 2024)
