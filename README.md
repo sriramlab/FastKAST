@@ -54,7 +54,7 @@ from FastKAST import getfullComponentPerm
 results = getfullComponentPerm(c,Z,y,Perm=10)
 ## results: {'pval': [obs_pval, perm_pval1, ..., perm_pval10]}     
 ```
-* Multi-trait analysis
+* Multi-traits analysis
 ```python
 ## Given covariates c: (NxM), input Z: (NxD), and output y: (NxK)
 from FastKAST import getfullComponentMulti
