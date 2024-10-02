@@ -12,18 +12,19 @@ Please check sub-branch for detailed instruction on each specific method.
 
 # Table of contents:
 1. [Installation](##Installation) 
-2. [Basic usage](##Basic usage) 
+2. [Basic usage](##Basic_usage) 
     1. [FastKAST](###FastKAST)
     2. [QuadKAST](###QuadKAST)
+3. [Useful functions](##Functions)
 
 
 ## Installation <a name="Installation"></a>
 1. You need python >= 3.60 in order to run the code (anaconda3 recommended)
-2. `pip install .`
+2. `pip install fast-kernel-set-test` or install from source
 
 You can either follow the standard pipeline `FastKAST_annot.py` and `QuadKAST_annot.py`, or import the neccessary function to build based on your own I/O.
 
-## Basic usage <a name="Basic usage"></a>
+## Basic usage <a name="Basic_usage"></a>
 
 ### FastKAST <a name="FastKAST"></a>
 To run the demo FastKAST code with a customized window size, you can generate a annotation file with "start_index end_index" as a row, and run
@@ -43,6 +44,22 @@ python QuadKAST_annot.py --bfile ./example/sim --phen ./example/sim.pheno --anno
 Or directly run
 ```
 sh run_quad_annot.sh
+```
+
+## Useful functions <a name="Functions"></a>
+* Single trait analysis
+```python
+## Given covariates c: (NxM), input Z: (NxD), and output y: (Nx1)
+from FastKAST import getfullComponentPerm
+results = getfullComponentPerm(c,Z,y,Perm=10)
+## results: {'pval': [obs_pval, perm_pval1, ..., perm_pval10]}     
+```
+* Multi-trait analysis
+```python
+## Given covariates c: (NxM), input Z: (NxD), and output y: (NxK)
+from FastKAST import getfullComponentMulti
+results = getfullComponentMulti(c,Z,y)
+## results: {'pval': [obs_pval1, obs_pval2, ..., obs_pvalK]}     
 ```
 
 ## Data availability
