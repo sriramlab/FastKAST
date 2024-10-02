@@ -11,11 +11,11 @@ This folder has been updated with both the [FastKAST](https://www.nature.com/art
 Please check sub-branch for detailed instruction on each specific method. 
 
 # Table of contents:
-1. [Installation](##Installation) 
-2. [Basic usage](##Basic_usage) 
-    1. [FastKAST](###FastKAST)
-    2. [QuadKAST](###QuadKAST)
-3. [Useful functions](##Functions)
+1. [Installation](#Installation) 
+2. [Basic usage](#Basic_usage) 
+    1. [FastKAST](#FastKAST)
+    2. [QuadKAST](#QuadKAST)
+3. [Useful functions](#Functions)
 
 
 ## Installation <a name="Installation"></a>
