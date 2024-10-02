@@ -8,8 +8,8 @@ def parse_requirements(filename):
         return [line.strip() for line in file if line and not line.startswith("#")]
 
 setup(
-    name="model_x_package",                # Name of the package
-    version="0.1.0",                    # Version of the package
+    name="fast-kernel-set-test",                # Name of the package
+    version="0.1.1",                    # Version of the package
     author="Boyang Fu",                
     author_email="fbyang1995@gmail.com", 
     description="This is the package for various epistasis related softwares.",  # A brief description
