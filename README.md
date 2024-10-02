@@ -3,6 +3,7 @@
 <img src="FastKAST.png" alt="icon" width="100"/>
 
 # Fast Model-X Kernel-based Set Testing Toolkits
+https://pypi.org/project/fast-kernel-set-test/0.1.0/
 
 
 This folder has been updated with both the [FastKAST](https://www.nature.com/articles/s41467-023-40346-2) and [QuadKAST](https://genome.cshlp.org/content/early/2024/08/29/gr.279140.124)
