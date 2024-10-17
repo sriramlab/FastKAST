@@ -1,9 +1,9 @@
 #!/bin/sh
 #$ -cwd
 #$ -l h_data=16G,h_rt=4:00:00
-#$ -e /u/scratch/p/panand2/joblogs/lipo_a
-#$ -o /u/scratch/p/panand2/joblogs/lipo_a
-#$ -N test
+#$ -e /u/scratch/a/aanand2/logs/quadkast.$JOB_ID
+#$ -o /u/scratch/a/aanand2/logs/quadkast.$JOB_ID
+#$ -N quadkast
 #$ -t 1-191:1
 
 # echo job info on joblog:
@@ -20,7 +20,7 @@ python --version
 
 basePath=/u/project/sriram/boyang19/Epi/UKBB/unrelWB
 
-trait=lipo_a
+trait=$1
 ofile=testStage$((SGE_TASK_ID-1))
 
 annot=/u/scratch/p/panand2/genes_info_array_50_inds
@@ -31,5 +31,5 @@ python QuadKAST_annot_CR.py \
 --phen ${basePath}/train/pheno_ivrt/${trait} --phenTest ${basePath}/test/pheno_ivrt/${trait} \
 --covar ${basePath}/train/pheno_ivrt/${trait}.covar --covarTest ${basePath}/test/pheno_ivrt/${trait}.covar \
 --getPval 'CCT' \
---annot ${annot} --output /u/scratch/p/panand2/FastKAST_regressor/results/${trait}_${threshold}/ \
+--annot ${annot} --output /u/scratch/a/aanand2/FastKAST_regressor/results/${trait}_${threshold}/ \
 --test general --threshold ${threshold} --stage test --filename ${ofile} --tindex ${SGE_TASK_ID}
