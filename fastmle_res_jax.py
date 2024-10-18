@@ -546,7 +546,7 @@ def getfullComponentPerm(X,
         U,S,_ = numpy_svd(Z,compute_uv=True)
     else:
         S = numpy_svd(Z)
-    print(S)
+    # print(S)
     print(f'y mean is {np.mean(y)}; std is {np.std(y)}')
     # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
 

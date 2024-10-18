@@ -13,6 +13,7 @@ from tqdm import tqdm as tqdm
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.impute import SimpleImputer
+from sklearn.kernel_approximation import RBFSampler
 import multiprocessing
 from bed_reader import open_bed
 import pandas_plink
@@ -54,10 +55,10 @@ def paraCompute(args):
     print(f'args: {args}')
     start_index, end_index = args
     print(f'start: {start_index}; end: {end_index}')
-    if end_index-start_index <=3:
+    if (end_index+1)-start_index <=3:
         print(f'Warning: target window size too small, numerical issue may encounter')
     M = G.shape[1]
-    
+
     if LDthresh > 0 and Test != 'general': # estimate the superwindow
         step_size=5
         max_iter=40
@@ -92,7 +93,7 @@ def paraCompute(args):
     wlen = end - start
     t0 = time.time()
     try:
-        if Test == 'nonlinear':
+        if Test == 'QuadOnly':
             if LDthresh > 0:
                 print(f'estimated ld block start: {left_index}; end at {right_index}')
                 c = 2 - G.read(index=np.s_[Yeffect,left_index:right_index])
@@ -103,7 +104,7 @@ def paraCompute(args):
                                                         superWindow * wlen)]
                            )  ## 2-G replicate the old conversion scheme
             # c = G[Yeffect, max(0,start-superWindow*wlen):min(G.shape[1],end+superWindow*wlen)].values
-            c_test = None ## shouldn't have c_test at this scenario
+            c_test = np.array([]) ## shouldn't have c_test at this scenario
         else:
             c = np.array([])
             if stage=='infer':
@@ -125,7 +126,7 @@ def paraCompute(args):
 
     # print(f'read value takes {t1-t0}')
     if covar:
-        if Test != 'nonlinear':
+        if Test != 'QuadOnly':
             c = covarfile
             if stage=='infer':
                 c_test = covarfile_test
@@ -135,7 +136,7 @@ def paraCompute(args):
                 c_test = np.concatenate((c_test, covarfile), axis=1)
         
     t0 = time.time()
-    if Test == 'nonlinear':
+    if Test == 'QuadOnly':
         nanfilter = ~np.isnan(c).any(axis=1)
     else:
         nanfilter1 = ~np.isnan(x).any(axis=1)
@@ -189,23 +190,22 @@ def paraCompute(args):
     
     mapping = None
     Zs = []
-    if Test=='nonlinear' or Test=='QuadOnly':
-        mapping = PolynomialFeatures((2, 2),interaction_only=inter_only,include_bias=False)
-        Z = mapping.fit_transform(x)
-        
+    if Test=='RBF':
         if stage == 'test':
             for gamma in gammas:
-                x_gamma = np.sqrt(gamma) * x
-                Z = mapping.fit_transform(x_gamma)
+                mapping = RBFSampler(gamma=gamma, n_components=map_dim*wlen, random_state=1)
+                Z = mapping.fit_transform(x)
                 Zs.append(Z)
                 
         elif stage == 'infer':
             print(f'Use sig gamma: {sig_gamma}')
-            x_gamma = np.sqrt(sig_gamma) * x
-            x_gamma_test = np.sqrt(sig_gamma) * x_test
-            Z = mapping.fit_transform(x_gamma)
+            mapping = RBFSampler(gamma=sig_gamma, n_components=map_dim*wlen, random_state=1)
+            Z = mapping.fit_transform(x)
             Zs.append(Z)
-        # Z = direct(x)
+
+    elif Test=='QuadOnly':
+        mapping = PolynomialFeatures((2, 2),interaction_only=inter_only,include_bias=False)
+        Z = mapping.fit_transform(x)
         
     elif Test=='linear':
         # mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
@@ -214,25 +214,15 @@ def paraCompute(args):
 
     elif Test=='general':
         mapping = PolynomialFeatures(degree=2,include_bias=False)
-
-        if stage == 'test':
-            for gamma in gammas:
-                x_gamma = np.sqrt(gamma) * x
-                Z = mapping.fit_transform(x_gamma)
-                Zs.append(Z)
-
-        elif stage == 'infer':
-            print(f'Use sig gamma: {sig_gamma}')
-            x_gamma = np.sqrt(sig_gamma) * x
-            x_gamma_test = np.sqrt(sig_gamma) * x_test
-            Z = mapping.fit_transform(x_gamma)
-            Zs.append(Z)
+        Z = mapping.fit_transform(x)
     
     else:
         raise Exception(f"The assigned test type {Test} is not supported")
     
     all_results = []
-    for Z in Zs:
+    for idx, Z in enumerate(Zs):
+        if Test=='RBF':
+            print(f"Testing hyperparameter: {gammas[idx]}")
         # scaler=StandardScaler()
         # scaler.fit(Z)
         # Z = scaler.transform(Z)
@@ -262,7 +252,7 @@ def paraCompute(args):
             if mapping is None:
                 Z_test = x_test.copy()
             else:
-                Z_test = mapping.fit_transform(x_gamma_test)
+                Z_test = mapping.transform(x_test)
             # Z_test = scaler.transform(Z_test)
             # Z_test = Z_test*1.0/np.sqrt(D)
             if c.size==0:
@@ -284,8 +274,8 @@ def paraCompute(args):
 
 def generate_embedding(annot_row, savepath, filename, EMB_train):
                  
-    if not os.path.isdir(f'{savepath}'):
-        os.makedirs(f'{savepath}')
+    # if not os.path.isdir(f'{savepath}'):
+    #     os.makedirs(f'{savepath}')
         
     print(f"Embedding for annot: {annot_row}")
 
@@ -359,8 +349,8 @@ def parseargs():  # handle user arguments
                         choices=['test', 'infer'],
                         help="Whether to perform testing or inference")
     parser.add_argument('--test',
-                        default='nonlinear',
-                        choices=['linear', 'nonlinear', 'general', 'QuadOnly'],
+                        default='RBF',
+                        choices=['linear', 'RBF', 'general', 'QuadOnly'],
                         help='What type of kernel to test')
     parser.add_argument('--threshold',
                         default=5e-6,
@@ -369,7 +359,11 @@ def parseargs():  # handle user arguments
                         default=[1.0],
                         type=float, 
                         nargs='+',
-                        help='Gamma values for kernel hyperparameter search')
+                        help='Gamma values for kernel hyperparameter search. Only relevant for RBF.')
+    parser.add_argument('--map',
+                        type=int,
+                        default=50,
+                        help='The mapping dimension divided by m. Only relevant fro RBF.')
     parser.add_argument('--inter_only',
                         action='store_true',
                         help="Test only the interaction?")
@@ -404,7 +398,8 @@ if __name__ == "__main__":
     getPval = args.getPval
 
     gammas = args.gammas
-    
+    map_dim = args.map
+
     assert phenTest is not None and bfile_test is not None 
     bed_test = bfile_test + '.bed'
     G_test = open_bed(bed_test)
@@ -450,6 +445,9 @@ if __name__ == "__main__":
     start_index = int(tindex*CR)
     end_index = int((tindex+1)*CR)
 
+    if end_index > gene_annot.shape[0]:
+        end_index = gene_annot.shape[0]
+
     Y = pd.read_csv(f'{phen}.pheno', delim_whitespace=True).iloc[:, -1].values
     Yeffect = (Y != -9) & (~np.isnan(Y))
     Y = Y[Yeffect]
@@ -471,8 +469,8 @@ if __name__ == "__main__":
 
     # filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
     filename = args.filename
-    if not os.path.isdir(f'{savepath}'):
-        os.makedirs(f'{savepath}')
+    # if not os.path.isdir(f'{savepath}'):
+    #     os.makedirs(f'{savepath}')
 
     sig_annot_rows = []
     sig_pvals = []
@@ -539,7 +537,7 @@ if __name__ == "__main__":
                         print(f'Generating embedding at {args.output}embeddings/')
                         sig_gamma = gammas[np.argmin(all_pvals)]
                         stage = 'infer'
-                        generate_embedding(annot_row, savepath=args.output+'embeddings', filename=f'gene_idx_{tindex*50 + count - 1}', EMB_train=EMB_train)
+                        generate_embedding(annot_row, savepath=args.output+'embeddings', filename=f'gene_idx_{tindex*CR + count - 1}', EMB_train=EMB_train)
                         stage = 'test'
 
                     all_rows.append([annot_row[0],annot_row[1]])
@@ -601,7 +599,7 @@ if __name__ == "__main__":
                         print(f'Generating embedding at {args.output}embeddings/')
                         sig_gamma = gammas[np.argmin(all_pvals)]
                         stage = 'infer'
-                        generate_embedding(annot_row, savepath=args.output+'embeddings', filename=f'gene_idx_{tindex*50 + count - 1}', EMB_train=EMB_train)
+                        generate_embedding(annot_row, savepath=args.output+'embeddings', filename=f'gene_idx_{tindex*CR + count - 1}', EMB_train=EMB_train)
                         stage = 'test'
 
                     all_rows.append([annot_row[0],annot_row[1]])
