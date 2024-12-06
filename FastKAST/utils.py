@@ -10,7 +10,8 @@ from numba import jit
 from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.kernel_approximation import RBFSampler
 from sklearn.preprocessing import scale
-
+from scipy.stats import chi2
+from scipy.optimize import minimize
 
 def dumpfile(data, path, filename, overwrite=False):
     isdir = os.path.isdir(path)
@@ -103,6 +104,63 @@ class QMC_RFF:
         # t1 = time.time()
         # print(f'Combin mult takes {t1-t0}')
         return np.float32(Combine)
+    
+    
+def mix_chi_fit(weights, x, phi, topk):
+    '''
+    Used for LRT -- fitting the mixture of chi-square given phi/pi
+    '''
+    samples = len(x)
+    a, d = weights
+    
+    topk_samples = int(topk*samples)
+    quantiles = np.linspace(0, 1, samples)[-topk_samples:] - 0.5/samples
+    
+    # theoretical_dist = mix_chi_quantile(quantiles,phi, a, d)
+    
+    top_empirical = np.sort(x)[-topk_samples:]
+    # print(f'empirical: {top_empirical}')
+    
+    top_theoretical = np.array([mix_chi_quantile(q, phi, a, d) for q in quantiles])
+    # print(f'theoretical: {top_theoretical}')
+
+    loss = np.sum(np.square(np.log(top_empirical+1e-10) - np.log(top_theoretical+1e-10)))
+    # print(f'loss is {loss}')
+    return loss
+
+def mix_chi_quantile(q, phi, a, d):
+    """
+    Compute the quantile for the mixture of chi-square distributions.
+    Args:
+        q: Quantile (e.g., 0.9 for the 90th percentile).
+        phi: Proportion of zeros in the mixture.
+        a: Scaling factor for chi(d).
+        d: Degrees of freedom for chi(d).
+    Returns:
+        Theoretical quantile value.
+    """
+    # Adjust for the mixture
+    if q <= phi:
+        return 0  # Quantiles below phi correspond to chi(0)
+    else:
+        q_adj = (q - phi) / (1 - phi)
+        return a * chi2.ppf(q_adj, d)
+    
+    
+def fit_null(x,top_ratio=0.1):
+    '''
+    Using LRT permutation statistics to perform curve fitting
+    Args:
+        x: log LR statistics
+        top_ratio: the top ratio used for curve fitting
+    '''
+    x = np.array(x)
+    bounds = [(1e-2, 100), (1e-2, 100)]
+    top=int(top_ratio*len(x))
+    phi=np.mean(x<=1e-6)
+    init_x = [1e0,1e0]
+    result = minimize(mix_chi_fit, init_x, args=(np.sort(x), phi, top_ratio), bounds=bounds, method="L-BFGS-B",options={'gtol': 1e-6, 'maxiter':1e5})
+    return result, phi
 
 
 if __name__ == "__main__":
