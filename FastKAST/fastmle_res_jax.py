@@ -291,8 +291,66 @@ def VarComponentEst(S, U, y, theta=False, dtype='quant',center=True,cov=False):
     return [
         h, sq_sigma_g, sq_sigma_e, gerr, eerr
     ]
+   
+   
+   
+def LRT(S, U, y, dtype='quant', Perm=0, Seed=None):
+    '''
+    ######### Boyang: Simple LRT without the inclusion of covariates #########
     
+    :S: vector of shape (K')
+    :yt: stands for transformed y. Shape (K') U.T@y
+    :y1: stands for B1^Ty. Shape (K)
+    :y: original trait. Shape (N)
+    Perm: number of permutations (default is 0)
+    '''
+    # delta is the initial guess of delta value
+    np.random.seed(Seed)
+    num_iter=1 + Perm
+    n = y.shape[0]
+    y = y.copy()
+    # print(f'U shape: {U.shape}; y shape: {y.shape}')
+    yt = U.T@y
+    LRT_stats = []
+    for it in range(num_iter):
+
+        if it > 0:
+            y = np.random.permutation(y)
+            yt = U.T@y
     
+        LLadd1 = np.sum(np.square(y - U @ yt)) ## sum_{i=1}^{N-K} yt_i^2
+    
+        optimizer = (minimize(lik, [0], args=(n, S, yt, LLadd1), method = 'Nelder-Mead', options={'maxiter':5000}))
+        logdelta = optimizer.x[0]
+    
+        fun = -1 * optimizer.fun
+    
+        delta = np.exp(logdelta)
+        h = 1 / (delta + 1)  # heritability
+        # print(h)
+        
+        sq_sigma_g = (sum(np.square(yt.flatten()) /
+                              (S + delta)) + LLadd1 / delta) / n
+        
+        sq_sigma_e = delta * sq_sigma_g
+    
+        L1 = -lik(logdelta, n, S, yt, LLadd1) + 0.5*n*np.log(n) - 0.5 * n * np.log(2*np.pi) - 0.5*n
+        # print(f'L1: {L1}')
+        yTy = (y.T @ y)[0]
+        if dtype == 'quant':
+            sq_sigma_e0 = yTy / n
+        else:
+            mu0 = np.sum(y) / n
+            sq_sigma_e0 = mu0 * (1 - mu0)
+    
+        L0 = -0.5 * (n * np.log(sq_sigma_e0) +
+                     n)  - 0.5 * n * np.log(2*np.pi)
+
+        LRT_stats.append(L1-L0[0])
+        
+    return np.array(LRT_stats)
+
+       
 def VarComponentEst_Cov_std(S, yt, y1, y, dtype='quant'):
     '''
     :S: vector of shape (K')
@@ -317,18 +375,6 @@ def VarComponentEst_Cov_std(S, yt, y1, y, dtype='quant'):
     t0 = time.time()
     # optimizer = (minimize(lik_cov, [0], args=(n, S, yt, LLadd1), method = 'Nelder-Mead', options={'maxiter':400}))
     optimizer = (minimize(lik_cov, [0], args=(n, S, yt, n), method = 'Nelder-Mead', options={'maxiter':400}))
-    # optimizer = (minimize(lik, [0],
-    #                       args=(n, S, UTy, LLadd1),
-    #                       method='L-BFGS-B',
-    #                       jac=dlik,
-    #                       options={
-    #                           'maxcor': 15,
-    #                           'ftol': 1e-10,
-    #                           'gtol': 1e-9,
-    #                           'maxfun': 30000,
-    #                           'maxiter': 30000,
-    #                           'maxls': 30
-    #                       }))
     logdelta = optimizer.x[0]
     t1 = time.time()
     # print(f'optimization takes {t1-t0}')
@@ -382,19 +428,6 @@ def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
     # optimizer = brent(lik, args=(n, S, UTy, LLadd1), brack = (-10, 10))
     t0 = time.time()
     optimizer = (minimize(lik_cov, [0], args=(n, S, yt, LLadd1), method = 'Nelder-Mead', options={'maxiter':5000}))
-    # print(optimizer)
-    # optimizer = (minimize(lik, [0],
-    #                       args=(n, S, UTy, LLadd1),
-    #                       method='L-BFGS-B',
-    #                       jac=dlik,
-    #                       options={
-    #                           'maxcor': 15,
-    #                           'ftol': 1e-10,
-    #                           'gtol': 1e-9,
-    #                           'maxfun': 30000,
-    #                           'maxiter': 30000,
-    #                           'maxls': 30
-    #                       }))
     logdelta = optimizer.x[0]
     t1 = time.time()
     # print(f'optimization takes {t1-t0}')
