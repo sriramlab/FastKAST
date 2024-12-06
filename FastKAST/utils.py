@@ -64,6 +64,7 @@ def CCT(pvals, ws=None):
     return pval
 
 
+
 class QMC_RFF:
     def __init__(self, gamma, d, n_components, seed=None, QMC='Halton'):
         assert n_components % 2 == 0
