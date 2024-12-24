@@ -16,37 +16,33 @@ from fastmle_res_jax import getfullComponentPerm
 from fastmle_res_jax import getmleComponent
 from sklearn.impute import SimpleImputer
 from utils import QMC_RFF
+from sklearn.kernel_approximation import RBFSampler
+import numpy as np
+import traceback
+from scipy.optimize import minimize
+import sys
+import gc
+from scipy.linalg import svd
+import time
+from numpy.linalg import inv
+import scipy
+from tqdm import tqdm
+from scipy.linalg import pinvh
+import fastlmmclib.quadform as qf
+from chi2comb import chi2comb_cdf, ChiSquared
+from sklearn.linear_model import LogisticRegression
+import scipy
+from numpy.core.umath_tests import inner1d
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import Ridge
+from sklearn.linear_model import LinearRegression
+from utils import mix_chi_fit, mix_chi_quantile, fit_null
 
 
-def direct_self(geno_matrix_in):
-    N=geno_matrix_in.shape[0]
-    M=geno_matrix_in.shape[1]
-    D = int((M*(M+1))/2)
-    exact = np.zeros((N, D))
-    s = 0
-    for i in range(M):
-        for j in range(i, M):
-            feature = geno_matrix_in[:,i]*geno_matrix_in[:,j]
-            exact[:,s] = feature
-            s += 1
-    exact_standard = stats.zscore(exact)
 
-    return exact_standard
 
-def direct_noself(geno_matrix_in):
-    N=geno_matrix_in.shape[0]
-    M=geno_matrix_in.shape[1]
-    D = int((M*(M-1))/2)
-    exact = np.zeros((N, D))
-    s = 0
-    for i in range(M):
-        for j in range(i+1, M):
-            feature = geno_matrix_in[:,i]*geno_matrix_in[:,j]
-            exact[:,s] = feature
-            s += 1
-    exact_standard = stats.zscore(exact)
 
-    return exact_standard
+
 
 def estimateSigmasGeneral(y,
                           Xc,
@@ -171,14 +167,3 @@ def estimateSigmasGeneral(y,
         return h
 
 
-def impute_def(x):
-    col_mean = np.nanmean(x, axis=0)
-    inds = np.where(np.isnan(x))
-    x[inds] = np.take(col_mean, inds[1])
-    return x
-
-
-def impute(x):
-    imp = SimpleImputer(missing_values=np.nan, strategy='mean')
-    x = imp.fit_transform(x)
-    return x
