@@ -1,20 +1,12 @@
 import numpy as np
-import os, re
+import os
 import argparse
-import sys
-from sys import path as syspath
-from os import path as ospath
 import time
-import math
 import pandas as pd
 from tqdm import tqdm as tqdm
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import PolynomialFeatures
-import multiprocessing
 from bed_reader import open_bed
-import pandas_plink
-from pandas_plink import read_plink1_bin
-from joblib import dump, load
 from estimators import *
 from utils import *
 
