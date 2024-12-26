@@ -4,7 +4,7 @@ import numpy as np
 import scipy
 from FastKAST.core.algebra import *
 from FastKAST.core.algebra import _inverse, _numpy_svd, _projection
-from FastKAST.stat_test.stat_test import score_test2
+from FastKAST.stat_test.stat_test import score_test2, score_test_qf
 from FastKAST.core.optim import *
 from FastKAST.VarComp.se_est import *
 from FastKAST.VarComp.var_est import *
@@ -58,7 +58,7 @@ def getfullComponentMulti(X,
         P1 = _inverse(X)
         # Z = left__projection(Z,X)
         # Z = _projection_QR(Z,X,P1)
-        Z = __projection(Z, X, P1)
+        Z = _projection(Z, X, P1)
         Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z),axis=1) ## K vector
         B1, _, _ = _numpy_svd(X,compute_uv=True) ## N_eff x N
         y1 = B1.T@y ## N_eff x K
@@ -130,8 +130,8 @@ def getfullComponentMulti(X,
     p_value1=score_test_qf(sq_sigma_e0, Q, S, center=center,multi=True)
     # p_value1 = score_test2(sq_sigma_e0, Q, S, center=center,multi=True)
     # print(f'pval is {p_value1}')
-    if Perm:
-        print(f'Perm not implement yet')
+    if isinstance(Perm, int) and Perm > 0:
+        print(f'Perm func is not implemented yet -- automatically ignored')
         # p_list = [p_value1]
         # for state in range(Perm):
         #     shuff_idx = np.random.RandomState(seed=state).permutation(n)
