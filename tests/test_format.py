@@ -40,14 +40,15 @@ def test_getfullComponentPerm(X, Z, y):
     assert all(isinstance(p_value[0], float) for p_value in results["pval"])
 
 
-# @pytest.mark.parametrize("X, Z, y", [generate_test_data(n_traits=5) for _ in range(5)])
-# def test_getfullComponentMulti(X, Z, y):
-#     """
-#     Tests the getfullComponentMulti function.
-#     """
-#     results = getfullComponentMulti(X, Z, y)
-#     assert "pvals" in results
-#     assert isinstance(results["pvals"][0], float)
+@pytest.mark.parametrize("X, Z, y", [generate_test_data(n_traits=5) for _ in range(5)])
+def test_getfullComponentMulti(X, Z, y):
+    """
+    Tests the getfullComponentMulti function.
+    """
+    results = getfullComponentMulti(X, Z, y, Perm=False)
+    assert "pvals" in results
+    assert isinstance(results["pvals"][0], float)
+    assert len(results["pvals"])==5
 
 
 # @pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(5)])

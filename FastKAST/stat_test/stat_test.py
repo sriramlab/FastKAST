@@ -73,11 +73,11 @@ def score_test_qf(sq_sigma_e0, Q, S, decompose=True, center=False,multi=False):
             p = stats[0]
             ps.append(p)
         ps = np.array(ps)
-        return (ps,'NaN')
+        return (ps)
     else:
         stats=qf.qf(Qe, S,sigma=1,lim=int(1e8),acc = 1e-15)
         p = stats[0]
-        return (p,'NaN')
+        return (p)
     
 
 ############### Likelihood Ratio Testing ############### 
