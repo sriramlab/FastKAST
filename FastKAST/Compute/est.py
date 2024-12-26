@@ -1,26 +1,15 @@
-from sklearn.kernel_approximation import RBFSampler
-import numpy as np
-import traceback
-from scipy.optimize import minimize
-import sys
-import gc
-from scipy.linalg import svd
 import time
-from numpy.linalg import inv
-import scipy
-from tqdm import tqdm
-from scipy.linalg import pinvh
-import fastlmmclib.quadform as qf
-from chi2comb import chi2comb_cdf, ChiSquared
-from sklearn.linear_model import LogisticRegression
-import scipy
-from numpy.core.umath_tests import inner1d
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.linear_model import Ridge
-from sklearn.linear_model import LinearRegression
-from FastKAST.Test.stat_test import mix_chi_fit, mix_chi_quantile, fit_null
 
-
+import numpy as np
+import scipy
+from FastKAST.core.algebra import *
+from FastKAST.core.algebra import _inverse, _numpy_svd, _projection
+from FastKAST.stat_test.stat_test import score_test2
+from FastKAST.core.optim import *
+from FastKAST.VarComp.se_est import *
+from FastKAST.VarComp.var_est import *
+from scipy.linalg import svd
+from scipy.optimize import minimize
 
 
 def getfullComponentMulti(X,
@@ -66,20 +55,20 @@ def getfullComponentMulti(X,
     else:
         k = X.shape[1]
     # yperm = np.random.permutation(y)
-        P1 = inverse(X)
-        # Z = left_projection(Z,X)
-        # Z = projection_QR(Z,X,P1)
-        Z = projection(Z, X, P1)
+        P1 = _inverse(X)
+        # Z = left__projection(Z,X)
+        # Z = _projection_QR(Z,X,P1)
+        Z = __projection(Z, X, P1)
         Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z),axis=1) ## K vector
-        B1, _, _ = numpy_svd(X,compute_uv=True) ## N_eff x N
+        B1, _, _ = _numpy_svd(X,compute_uv=True) ## N_eff x N
         y1 = B1.T@y ## N_eff x K
     # Z = Z - X@P1@(X.T@Z)
     t1 = time.time()
     # print(f'Z operation takes {t1-t0}')
     if VarCompEst:
-        U,S,_ = numpy_svd(Z,compute_uv=True)
+        U,S,_ = _numpy_svd(Z,compute_uv=True)
     else:
-        S = numpy_svd(Z)
+        S = _numpy_svd(Z)
     # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
 
     t1 = time.time()
@@ -143,7 +132,6 @@ def getfullComponentMulti(X,
     # print(f'pval is {p_value1}')
     if Perm:
         print(f'Perm not implement yet')
-        pass
         # p_list = [p_value1]
         # for state in range(Perm):
         #     shuff_idx = np.random.RandomState(seed=state).permutation(n)
@@ -195,21 +183,21 @@ def getfullComponentPerm(X,
     else:
         k = X.shape[1]
     # yperm = np.random.permutation(y)
-        P1 = inverse(X)
-        # Z = left_projection(Z,X)
-        # Z = projection_QR(Z,X,P1)
-        Z = projection(Z, X, P1)
+        P1 = _inverse(X)
+        # Z = left__projection(Z,X)
+        # Z = _projection_QR(Z,X,P1)
+        Z = _projection(Z, X, P1)
         Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z))
-        B1, _, _ = numpy_svd(X,compute_uv=True)
+        B1, _, _ = _numpy_svd(X,compute_uv=True)
         y1 = B1.T@y
     # Z = Z - X@P1@(X.T@Z)
     t1 = time.time()
     # print(f'Z operation takes {t1-t0}')
     t0 = time.time()
     if VarCompEst:
-        U,S,_ = numpy_svd(Z,compute_uv=True)
+        U,S,_ = _numpy_svd(Z,compute_uv=True)
     else:
-        S = numpy_svd(Z)
+        S = _numpy_svd(Z)
     # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
 
     t1 = time.time()
@@ -300,18 +288,18 @@ def getfullComponent(X, Z, y, dtype='quant', center=False, method='Scipy'):
     y = y.reshape(-1, 1)
     k = X.shape[1]
     yperm = np.random.permutation(y)
-    P1 = inverse(X)
+    P1 = _inverse(X)
     start = time.time()
     t1 = time.time()
-    print(f'inverse P1 takes {t1-t0}')
+    print(f'_inverse P1 takes {t1-t0}')
     if center:
         print(f'SVD for PKP')
         t1 = time.time()
-        Z = projection(Z, X, P1)
+        Z = _projection(Z, X, P1)
         t0 = time.time()
         print(f'Z operation takes {t1-t0}')
     
-        S = numpy_svd(Z)
+        S = _numpy_svd(Z)
         # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
         t1 = time.time()
         print(f'svd takes {t1-t0}')
@@ -372,12 +360,12 @@ def getRLComponent(X,
     X = np.concatenate((np.ones((n, 1)), X), axis=1)
     k = X.shape[1]
     yperm = np.random.permutation(y)
-    P1 = inverse(X)
+    P1 = _inverse(X)
     t1 = time.time()
     p = X.shape[1]
     if center:
         t0 = time.time()
-        Z = projection(Z, X, P1)
+        Z = _projection(Z, X, P1)
         t1 = time.time()
         # print(f'Z operation takes {t1-t0}')
         S = scipy.linalg.svd(X, full_matrices=False, compute_uv=False)
@@ -450,8 +438,8 @@ def getmleComponent(X, K, y, center=False):
     # P1= X@np.linalg.inv(X.T@X)@X.T
     # P = np.eye(n)-P1
     # PKP = P@K@P
-    P1 = inverse(X)
-    P1 = projection_mle(X, P1)
+    P1 = _inverse(X)
+    P1 = _projection_mle(X, P1)
     P = np.eye(n) - P1
     PKP = PKP_comp(P, K)
     Q = y.T @ PKP @ y
@@ -558,5 +546,3 @@ def LRT(S, U, y, dtype='quant', Perm=0, Seed=None):
         LRT_stats.append(L1-L0[0])
         
     return np.array(LRT_stats)
-
-       
