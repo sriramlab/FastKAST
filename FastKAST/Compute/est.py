@@ -2,14 +2,16 @@ import time
 
 import numpy as np
 import scipy
+from scipy.linalg import svd
+from scipy.optimize import minimize
 from FastKAST.core.algebra import *
 from FastKAST.core.algebra import _inverse, _numpy_svd, _projection
+from FastKAST.core.optim import _lik
 from FastKAST.stat_test.stat_test import score_test2, score_test_qf
 from FastKAST.core.optim import *
 from FastKAST.VarComp.se_est import *
 from FastKAST.VarComp.var_est import *
-from scipy.linalg import svd
-from scipy.optimize import minimize
+
 
 
 def getfullComponentMulti(X,
@@ -491,13 +493,11 @@ def getmleComponent(X, K, y, center=False):
 
 
    
-def LRT(S, U, y, dtype='quant', Perm=0, Seed=None):
+def LRT(Z, y, dtype='quant', Perm=0, Seed=None):
     '''
     ######### Boyang: Simple LRT without the inclusion of covariates #########
     
-    :S: vector of shape (K')
-    :yt: stands for transformed y. Shape (K') U.T@y
-    :y1: stands for B1^Ty. Shape (K)
+    :Z: input testing data
     :y: original trait. Shape (N)
     Perm: number of permutations (default is 0)
     '''
@@ -505,6 +505,16 @@ def LRT(S, U, y, dtype='quant', Perm=0, Seed=None):
     np.random.seed(Seed)
     num_iter=1 + Perm
     n = y.shape[0]
+    
+    U,S,_ = _numpy_svd(Z,compute_uv=True)
+    # print(f'U shape is {U.shape}; S shape is {S.shape}')
+
+    S = np.square(S)
+    S[S <= 1e-6] = 0
+    filtered=np.nonzero(S)[0]
+    S = S[filtered]
+
+    
     y = y.copy()
     # print(f'U shape: {U.shape}; y shape: {y.shape}')
     yt = U.T@y
@@ -517,7 +527,7 @@ def LRT(S, U, y, dtype='quant', Perm=0, Seed=None):
     
         LLadd1 = np.sum(np.square(y - U @ yt)) ## sum_{i=1}^{N-K} yt_i^2
     
-        optimizer = (minimize(lik, [0], args=(n, S, yt, LLadd1), method = 'Nelder-Mead', options={'maxiter':5000}))
+        optimizer = (minimize(_lik, [0], args=(n, S, yt, LLadd1), method = 'Nelder-Mead', options={'maxiter':5000}))
         logdelta = optimizer.x[0]
     
         fun = -1 * optimizer.fun
@@ -531,7 +541,7 @@ def LRT(S, U, y, dtype='quant', Perm=0, Seed=None):
         
         sq_sigma_e = delta * sq_sigma_g
     
-        L1 = -lik(logdelta, n, S, yt, LLadd1) + 0.5*n*np.log(n) - 0.5 * n * np.log(2*np.pi) - 0.5*n
+        L1 = -_lik(logdelta, n, S, yt, LLadd1) + 0.5*n*np.log(n) - 0.5 * n * np.log(2*np.pi) - 0.5*n
         # print(f'L1: {L1}')
         yTy = (y.T @ y)[0]
         if dtype == 'quant':
