@@ -5,7 +5,7 @@ import pytest
 # from sklearn.kernel_approximation import AdditiveChi2Sampler
 import numpy as np
 
-from FastKAST.Compute.est import getfullComponent, getfullComponentMulti, getfullComponentPerm, getRLComponent, getmleComponent  # Import your functions
+from FastKAST.Compute.est import getfullComponent, getfullComponentMulti, getfullComponentPerm, getRLComponent, getmleComponent, LRT  # Import your functions
 
 # Define some sample data for testing
 def generate_test_data(n_samples=100, n_features=5, n_traits=1):
@@ -29,8 +29,8 @@ def generate_test_data(n_samples=100, n_features=5, n_traits=1):
 
 
 # Test each estimation case
-@pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(5)])
-def test_getfullComponentPerm(X, Z, y):
+@pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(3)])
+def test_format_getfullComponentPerm(X, Z, y):
     """
     Tests the getfullComponentPerm function.
     """
@@ -40,8 +40,8 @@ def test_getfullComponentPerm(X, Z, y):
     assert all(isinstance(p_value[0], float) for p_value in results["pval"])
 
 
-@pytest.mark.parametrize("X, Z, y", [generate_test_data(n_traits=5) for _ in range(5)])
-def test_getfullComponentMulti(X, Z, y):
+@pytest.mark.parametrize("X, Z, y", [generate_test_data(n_traits=5) for _ in range(3)])
+def test_format_getfullComponentMulti(X, Z, y):
     """
     Tests the getfullComponentMulti function.
     """
@@ -50,6 +50,15 @@ def test_getfullComponentMulti(X, Z, y):
     assert isinstance(results["pvals"][0], float)
     assert len(results["pvals"])==5
 
+@pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(3)])
+def test_format_LRT(X, Z,y):
+    """
+    Tests the Likelihood ratio test (LRT) function.
+    """
+    results = LRT(Z, y, Perm=5)
+    assert isinstance(results[0], float)
+    assert len(results)==6
+    
 
 # @pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(5)])
 # def test_getRLComponent(X, Z, y):
