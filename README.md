@@ -1,8 +1,6 @@
-<a href="https://zenodo.org/badge/latestdoi/429674106"><img src="https://zenodo.org/badge/429674106.svg" alt="DOI"></a>
-# Fast Kernel-based Association Testing of non-linear genetic effectstor Biobank-scale data
+# A Scalable Adaptive Quadratic Kernel Method for Interpretable Epistasis Analysis in Complex Traits
 
-FastKAST is a highly scalable method for testing complex nonlinear relationships between a set of SNPs with a target trait. FastKAST uses a kernel function to model these non-linear relationships. Since direct computation using the kernel function is computationally prohibitive, FastKast uses insights from modern scalable machine learning to obtain an approximation that is efficient to compute. In particular, FastKAST is scalable to large sample size, and testing on 500K set with 30 snps can be done with a few minutes
-
+QuadKAST extends the FastKAST software by incorporating quadratic families, enhancing its functionality. Building on the scalability advantages of FastKAST, QuadKAST introduces robust support for quantifying epistasis strength in an interpretable manner.
 
 ## Requirements
 1. You need python >= 3.60 in order to run the code (anaconda3 recommended)
@@ -57,7 +55,7 @@ sh run.sh
 
 To run the demo code with a customized window size, you can generate a annotation file with "start_index end_index" as a row, and run
 ```
-python FastKAST_annot.py --bfile ./example/sim --phen ./example/sim.pheno --annot ./example/sim.annot
+python QuadKAST_annot.py --bfile ./example/sim --phen ./example/sim.pheno --annot ./example/sim.annot
 ```
 Or directly run
 ```
