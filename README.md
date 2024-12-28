@@ -1,5 +1,6 @@
 # A Scalable Adaptive Quadratic Kernel Method for Interpretable Epistasis Analysis in Complex Traits
 
+[paper link](https://genome.cshlp.org/content/34/9/1294)
 QuadKAST extends the FastKAST software by incorporating quadratic families, enhancing its functionality. Building on the scalability advantages of FastKAST, QuadKAST introduces robust support for quantifying epistasis strength in an interpretable manner.
 
 ## Requirements
