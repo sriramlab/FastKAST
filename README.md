@@ -66,3 +66,4 @@ results = getfullComponentMulti(c,Z,y)
 The detailed statistics used to generate the main table and the Venn diagram of the paper are provided in the `Data` folder
 
 ✅ Efficient multi-traits analysis (Sep 30, 2024)
+✅ Refactor the function into class (Dec 28, 2024)
