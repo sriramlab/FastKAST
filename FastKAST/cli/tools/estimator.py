@@ -1,52 +1,14 @@
 import numpy as np
-import os, re
+import os
+import argparse
 import time
-from sys import path as syspath
-from os import path as ospath
-# from sklearn.linear_model import LinearRegression
-from sklearn.metrics.pairwise import pairwise_kernels
-# from sklearn.metrics.pairwise import additive_chi2_kernel
-# from sklearn.kernel_approximation import AdditiveChi2Sampler
-from sklearn.kernel_approximation import RBFSampler
-from sklearn import preprocessing
+import pandas as pd
+from tqdm import tqdm as tqdm
+from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import PolynomialFeatures
-from fastmle_res_jax import getfullComponent as getfullComponent1
-from fastmle_res_jax import getRLComponent as getfullComponent2
-from fastmle_res_jax import getfullComponentPerm
-from fastmle_res_jax import getmleComponent
-from sklearn.impute import SimpleImputer
-from utils import QMC_RFF
+from FastKAST.Compute.est import getfullComponent, getfullComponentMulti, getfullComponentPerm, getRLComponent, getmleComponent, LRT  # Import your functions
 
 
-def direct_self(geno_matrix_in):
-    N=geno_matrix_in.shape[0]
-    M=geno_matrix_in.shape[1]
-    D = int((M*(M+1))/2)
-    exact = np.zeros((N, D))
-    s = 0
-    for i in range(M):
-        for j in range(i, M):
-            feature = geno_matrix_in[:,i]*geno_matrix_in[:,j]
-            exact[:,s] = feature
-            s += 1
-    exact_standard = stats.zscore(exact)
-
-    return exact_standard
-
-def direct_noself(geno_matrix_in):
-    N=geno_matrix_in.shape[0]
-    M=geno_matrix_in.shape[1]
-    D = int((M*(M-1))/2)
-    exact = np.zeros((N, D))
-    s = 0
-    for i in range(M):
-        for j in range(i+1, M):
-            feature = geno_matrix_in[:,i]*geno_matrix_in[:,j]
-            exact[:,s] = feature
-            s += 1
-    exact_standard = stats.zscore(exact)
-
-    return exact_standard
 
 def estimateSigmasGeneral(y,
                           Xc,
@@ -169,16 +131,3 @@ def estimateSigmasGeneral(y,
         Z = (Z) / np.sqrt(Z.shape[1])
         h = getfullComponent1(Xc, Z, y, center=center)
         return h
-
-
-def impute_def(x):
-    col_mean = np.nanmean(x, axis=0)
-    inds = np.where(np.isnan(x))
-    x[inds] = np.take(col_mean, inds[1])
-    return x
-
-
-def impute(x):
-    imp = SimpleImputer(missing_values=np.nan, strategy='mean')
-    x = imp.fit_transform(x)
-    return x
