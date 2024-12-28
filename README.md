@@ -1,21 +1,21 @@
-<a href="https://zenodo.org/badge/latestdoi/429674106"><img src="https://zenodo.org/badge/429674106.svg" alt="DOI"></a>
-
 <img src="FastKAST.png" alt="icon" width="100"/>
 
 # Fast Model-X Kernel-based Set Testing Toolkits
 https://pypi.org/project/fast-kernel-set-test
 
 
-This folder has been updated with both the [FastKAST](https://www.nature.com/articles/s41467-023-40346-2) and [QuadKAST](https://genome.cshlp.org/content/early/2024/08/29/gr.279140.124)
+This project integrates both [FastKAST](https://www.nature.com/articles/s41467-023-40346-2) and the [QuadKAST](https://genome.cshlp.org/content/early/2024/08/29/gr.279140.124), with the purpose of increasing the software flexibility. 
 
 Please check sub-branch for detailed instruction on each specific method. 
 
 # Table of contents:
 1. [Installation](#Installation) 
 2. [Basic usage](#Basic_usage) 
-    1. [FastKAST](#FastKAST)
-    2. [QuadKAST](#QuadKAST)
-3. [Useful functions](#Functions)
+    a. [Hypothesis testing](#hypertest)
+    b. [FastKAST](#FastKAST)
+    c. [QuadKAST](#QuadKAST)
+    d. [SKAT](#SKAT)
+    e. [Customized kernels](#custom)
 
 
 ## Installation <a name="Installation"></a>
@@ -26,40 +26,74 @@ You can either follow the standard pipeline `FastKAST_annot.py` and `QuadKAST_an
 
 ## Basic usage <a name="Basic_usage"></a>
 
-### FastKAST <a name="FastKAST"></a>
-To run the demo FastKAST code with a customized window size, you can generate a annotation file with "start_index end_index" as a row, and run
-```
-python FastKAST_annot.py --bfile ./example/sim --phen ./example/sim.pheno --annot ./example/sim.new.annot
-```
-Or directly run
-```
-sh run_rbf_annot.sh
-```
+### Hypothesis Testing <a name="hypertest"></a>
+The hypothesis testing functions offer flexible usage without extra data format or processing dependencies. 
 
-### QuadKAST <a name="QuadKAST"></a>
-To run the demo QuadKAST code with a customized window size, you can generate a annotation file with "start_index end_index" as a row, and run
-```
-python QuadKAST_annot.py --bfile ./example/sim --phen ./example/sim.pheno --annot ./example/sim.new.annot
-```
-Or directly run
-```
-sh run_quad_annot.sh
-```
-
-## Useful functions <a name="Functions"></a>
 * Single trait analysis
-```python
-## Given covariates c: (NxM), input Z: (NxD), and output y: (Nx1)
-from FastKAST import getfullComponentPerm
+```
+### Given covariates c: (NxM), input Z: (NxD), and output y: (Nx1)
+from FastKAST.Compute.est import getfullComponentPerm
 results = getfullComponentPerm(c,Z,y,Perm=10)
 ## results: {'pval': [obs_pval, perm_pval1, ..., perm_pval10]}     
 ```
+
 * Multi-traits analysis
-```python
+```
 ## Given covariates c: (NxM), input Z: (NxD), and output y: (NxK)
-from FastKAST import getfullComponentMulti
+from FastKAST.Compute.est import getfullComponentMulti
 results = getfullComponentMulti(c,Z,y)
 ## results: {'pval': [obs_pval1, obs_pval2, ..., obs_pvalK]}     
+```
+
+
+### FastKAST function <a name="FastKAST"></a>
+FastKAST by default adapts the rbf kernel testing.
+
+```
+from FastKAST.methods.fastkast import FastKASTComponent
+## Construct object
+fastkast_component = FastKASTComponent(X, Z, y, MapFunc='rbf', D=50)
+## Execution
+results = fastkast_component.run()
+```
+
+
+### QuadKAST function <a name="QuadKAST"></a>
+QuadKAST by default adapts the quadratic only kernel testing (e.g., in the absence of additive component).
+
+```
+from FastKAST.methods.fastkast import FastKASTComponent
+## Construct object
+fastkast_component = FastKASTComponent(X, Z, y, MapFunc='quadOnly') ## D is unused under explicit kernel construction
+## Execution
+results = fastkast_component.run()
+```
+
+
+### SKAT function <a name="SKAT"></a>
+SKAT by default adapts the linear kernel testing. 
+
+```
+from FastKAST.methods.fastkast import FastKASTComponent
+## Construct object
+fastkast_component = FastKASTComponent(X, Z, y, MapFunc='linear') 
+## Execution
+results = fastkast_component.run()
+```
+
+### Customized kernel <a name="custom"></a>
+The users are allowed to construct customized kernel based on their own need. The customized kernel is supposed to take the input data and transform to another matrix in the mapped dimension. 
+
+```
+### Test customized kernel
+    def mapping(Z):
+        mapping_func = PolynomialCountSketch(n_components=50)
+        Z = mapping_func.fit_transform(Z)
+        return Z
+## Construct object
+fastkast_component = FastKASTComponent(X, Z, y, mapping=mapping)
+## Execution
+results = fastkast_component.run()
 ```
 
 ## Data availability
