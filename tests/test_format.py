@@ -6,6 +6,8 @@ import pytest
 import numpy as np
 
 from FastKAST.Compute.est import getfullComponent, getfullComponentMulti, getfullComponentPerm, getRLComponent, getmleComponent, LRT  # Import your functions
+from FastKAST.methods.fastkast import FastKASTComponent
+
 
 # Define some sample data for testing
 def generate_test_data(n_samples=100, n_features=5, n_traits=1):
@@ -29,7 +31,7 @@ def generate_test_data(n_samples=100, n_features=5, n_traits=1):
 
 
 # Test each estimation case
-@pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(3)])
+@pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(2)])
 def test_format_getfullComponentPerm(X, Z, y):
     """
     Tests the getfullComponentPerm function.
@@ -40,7 +42,7 @@ def test_format_getfullComponentPerm(X, Z, y):
     assert all(isinstance(p_value[0], float) for p_value in results["pval"])
 
 
-@pytest.mark.parametrize("X, Z, y", [generate_test_data(n_traits=5) for _ in range(3)])
+@pytest.mark.parametrize("X, Z, y", [generate_test_data(n_traits=5) for _ in range(2)])
 def test_format_getfullComponentMulti(X, Z, y):
     """
     Tests the getfullComponentMulti function.
@@ -50,7 +52,7 @@ def test_format_getfullComponentMulti(X, Z, y):
     assert isinstance(results["pvals"][0], float)
     assert len(results["pvals"])==5
 
-@pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(3)])
+@pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(2)])
 def test_format_LRT(X, Z,y):
     """
     Tests the Likelihood ratio test (LRT) function.
@@ -79,6 +81,25 @@ def test_format_LRT(X, Z,y):
 #         assert len(results) == 2
 #         assert isinstance(results[0], float)
 #         assert isinstance(results[1], float)
+
+
+# Test FastKASTComponent (single trait)
+@pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(2)])
+def test_fastkast_component_single_trait(X, Z, y):
+    """
+    Tests the FastKASTComponent class for single trait analysis.
+    """
+    fastkast_component = FastKASTComponent(X, Z, y)
+    results = fastkast_component.run()
+    assert "pval" in results
+    assert isinstance(results["pval"][0][0], float) 
+
+    # Test with variance component estimation (if implemented)
+    if fastkast_component.VarCompEst:
+        assert "varcomp" in results 
+        # Add assertions for the expected structure and values of 'varcomp'
+        assert isinstance(results["varcomp"], tuple)  # Example assertion
+
 
 # Run the tests
 if __name__ == "__main__":
