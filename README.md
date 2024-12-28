@@ -10,11 +10,11 @@ Refer to the sub-branches for detailed instructions on each specific method.
 ##  **Table of Contents**
 1. [Installation](#Installation) 
 2. [Basic usage](#Basic_usage) 
-    a. [Hypothesis testing](#hypertest)
-    b. [FastKAST](#FastKAST)
-    c. [QuadKAST](#QuadKAST)
-    d. [SKAT](#SKAT)
-    e. [Customized kernels](#custom)
+   -  [Hypothesis testing](#hypertest)
+   -  [FastKAST](#FastKAST)
+   - [QuadKAST](#QuadKAST)
+   - [SKAT](#SKAT)
+   - [Customized kernels](#custom)
 3. [Data Availability](#data-availability)
 
 
