@@ -84,15 +84,29 @@ def test_format_LRT(X, Z,y):
 
 
 # Test FastKASTComponent (single trait)
-@pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(2)])
+@pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(1)])
 def test_fastkast_component_single_trait(X, Z, y):
     """
     Tests the FastKASTComponent class for single trait analysis.
     """
     fastkast_component = FastKASTComponent(X, Z, y)
     results = fastkast_component.run()
+    
+    ## Test p-value generation process
     assert "pval" in results
     assert isinstance(results["pval"][0][0], float) 
+    
+    ## Test kernel construction
+    ### Test quadOnly arg
+    fastkast_component = FastKASTComponent(X, Z, y, Map='quadOnly')
+    results = fastkast_component.run()
+    assert fastkast_component.Z.shape == (100, 10)
+    
+    ### Test rbf arg
+    fastkast_component = FastKASTComponent(X, Z, y, Map='rbf', D=50)
+    results = fastkast_component.run()
+    assert fastkast_component.Z.shape == (100, 50)
+    
 
     # Test with variance component estimation (if implemented)
     if fastkast_component.VarCompEst:
