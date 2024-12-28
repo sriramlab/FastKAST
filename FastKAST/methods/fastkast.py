@@ -23,7 +23,7 @@ class FastKASTComponent:
     """
 
     def __init__(self, X, Z, y, theta=False, dtype='quant', center=True, 
-                 method='Numpy', Perm=10, Map='linear', 
+                 method='Numpy', Perm=10, MapFunc='linear', 
                  VarCompEst=False, varCompStd=False, D=10, gamma=0.1, Random_state=0, mapping=None):
         """
         Initialize the FastKASTComponent object.
@@ -37,7 +37,7 @@ class FastKASTComponent:
             center (bool, optional): Whether to center the data. Defaults to True.
             method (str, optional): Method for computation. Defaults to 'Numpy'.
             Perm (int, optional): Number of permutations for p-value calculation. Defaults to 10.
-            Map (str, optional): Ways to map the feature. Defaults to 'nonlinear'.
+            MapFunc (str, optional): Function used to map the feature. Defaults to 'nonlinear'.
             VarCompEst (bool, optional): Whether to estimate variance components. Defaults to False.
             varCompStd (bool, optional): Whether to standardize variance components. Defaults to False.
         """
@@ -49,7 +49,7 @@ class FastKASTComponent:
         self.center = center
         self.method = method
         self.Perm = Perm
-        self.Map = Map
+        self.MapFunc = MapFunc
         self.VarCompEst = VarCompEst
         self.varCompStd = varCompStd
         self.D = D
@@ -89,22 +89,22 @@ class FastKASTComponent:
         """
         if self.mapping is not None:
             ## Use customized mapping function
-            self.Z = mapping(self.Z)
+            self.Z = self.mapping(self.Z)
             
-        if self.Map=='linear':
+        if self.MapFunc=='linear':
             ## Use linear mapping function
             self.Z = (self.Z) / np.sqrt(self.Z.shape[1])
             
-        elif self.Map=='rbf':
+        elif self.MapFunc=='rbf':
             ## Use RBF approximation
             mapping = RBFSampler(gamma=self.gamma,
                             n_components=self.D,
                             random_state=self.Random_state)
             self.mapping = mapping
-            Z = mapping.fit_transform(self.Z)
+            Z = self.mapping.fit_transform(self.Z)
             self.Z = (Z) / np.sqrt(Z.shape[1])
             
-        elif self.Map=='quadOnly':
+        elif self.MapFunc=='quadOnly':
             ## Use quadratic only feature map
             mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
             self.mapping = mapping
@@ -113,7 +113,7 @@ class FastKASTComponent:
             
         
         else:
-            raise NotImplementedError(f"{self.Map} is not implemented") 
+            raise NotImplementedError(f"{self.MapFunc} is not implemented") 
     
     def _compute_svd(self):
         """

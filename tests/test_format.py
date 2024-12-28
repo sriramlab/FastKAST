@@ -4,7 +4,7 @@ import pytest
 # from sklearn.metrics.pairwise import additive_chi2_kernel
 # from sklearn.kernel_approximation import AdditiveChi2Sampler
 import numpy as np
-
+from sklearn.kernel_approximation import PolynomialCountSketch
 from FastKAST.Compute.est import getfullComponent, getfullComponentMulti, getfullComponentPerm, getRLComponent, getmleComponent, LRT  # Import your functions
 from FastKAST.methods.fastkast import FastKASTComponent
 
@@ -98,15 +98,24 @@ def test_fastkast_component_single_trait(X, Z, y):
     
     ## Test kernel construction
     ### Test quadOnly arg
-    fastkast_component = FastKASTComponent(X, Z, y, Map='quadOnly')
+    fastkast_component = FastKASTComponent(X, Z, y, MapFunc='quadOnly')
     results = fastkast_component.run()
     assert fastkast_component.Z.shape == (100, 10)
     
     ### Test rbf arg
-    fastkast_component = FastKASTComponent(X, Z, y, Map='rbf', D=50)
+    fastkast_component = FastKASTComponent(X, Z, y, MapFunc='rbf', D=50)
     results = fastkast_component.run()
     assert fastkast_component.Z.shape == (100, 50)
     
+    ### Test customized kernel
+    def mapping(Z):
+        mapping_func = PolynomialCountSketch(n_components=50)
+        Z = mapping_func.fit_transform(Z)
+        return Z
+    
+    fastkast_component = FastKASTComponent(X, Z, y, mapping=mapping)
+    results = fastkast_component.run()
+    assert fastkast_component.Z.shape == (100, 50)
 
     # Test with variance component estimation (if implemented)
     if fastkast_component.VarCompEst:
