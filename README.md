@@ -1,14 +1,13 @@
 <img src="FastKAST.png" alt="icon" width="100"/>
 
-# Fast Model-X Kernel-based Set Testing Toolkits
-https://pypi.org/project/fast-kernel-set-test
+# **Fast Model-X Kernel-based Set Testing Toolkits**
+[**PyPI Package**](https://pypi.org/project/fast-kernel-set-test)
 
+This project integrates both [**FastKAST**](https://www.nature.com/articles/s41467-023-40346-2) and [**QuadKAST**](https://genome.cshlp.org/content/early/2024/08/29/gr.279140.124) to enhance software flexibility and usability. 
 
-This project integrates both [FastKAST](https://www.nature.com/articles/s41467-023-40346-2) and the [QuadKAST](https://genome.cshlp.org/content/early/2024/08/29/gr.279140.124), with the purpose of increasing the software flexibility. 
+Refer to the sub-branches for detailed instructions on each specific method.
 
-Please check sub-branch for detailed instruction on each specific method. 
-
-# Table of contents:
+##  **Table of Contents**
 1. [Installation](#Installation) 
 2. [Basic usage](#Basic_usage) 
     a. [Hypothesis testing](#hypertest)
@@ -16,6 +15,7 @@ Please check sub-branch for detailed instruction on each specific method.
     c. [QuadKAST](#QuadKAST)
     d. [SKAT](#SKAT)
     e. [Customized kernels](#custom)
+3. [Data Availability](#data-availability)
 
 
 ## Installation <a name="Installation"></a>
@@ -96,7 +96,7 @@ fastkast_component = FastKASTComponent(X, Z, y, mapping=mapping)
 results = fastkast_component.run()
 ```
 
-## Data availability
+## Data availability<a name="data-availability"></a>
 The detailed statistics used to generate the main table and the Venn diagram of the paper are provided in the `Data` folder
 
 ✅ Efficient multi-traits analysis (Sep 30, 2024)
