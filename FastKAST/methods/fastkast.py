@@ -4,6 +4,8 @@ import numpy as np
 import scipy
 from scipy.linalg import svd
 from scipy.optimize import minimize
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.kernel_approximation import RBFSampler
 from FastKAST.core.algebra import *
 from FastKAST.core.algebra import _inverse, _numpy_svd, _projection
 from FastKAST.core.optim import _lik
@@ -21,13 +23,13 @@ class FastKASTComponent:
     """
 
     def __init__(self, X, Z, y, theta=False, dtype='quant', center=True, 
-                 method='Numpy', Perm=10, Test='linear', 
-                 VarCompEst=False, varCompStd=False):
+                 method='Numpy', Perm=10, Map='linear', 
+                 VarCompEst=False, varCompStd=False, D=10, gamma=0.1, Random_state=0, mapping=None):
         """
         Initialize the FastKASTComponent object.
 
         Args:
-            X (np.ndarray): Covariates to be regressed out.
+            X (np.ndarray): Covariates to be regressed out. -- If intend to test 
             Z (np.ndarray): Genotype (transformed) matrix.
             y (np.ndarray): Phenotype vector.
             theta (bool, optional): Whether to include theta in the model. Defaults to False.
@@ -35,7 +37,7 @@ class FastKASTComponent:
             center (bool, optional): Whether to center the data. Defaults to True.
             method (str, optional): Method for computation. Defaults to 'Numpy'.
             Perm (int, optional): Number of permutations for p-value calculation. Defaults to 10.
-            Test (str, optional): Type of test. Defaults to 'nonlinear'.
+            Map (str, optional): Ways to map the feature. Defaults to 'nonlinear'.
             VarCompEst (bool, optional): Whether to estimate variance components. Defaults to False.
             varCompStd (bool, optional): Whether to standardize variance components. Defaults to False.
         """
@@ -47,10 +49,13 @@ class FastKASTComponent:
         self.center = center
         self.method = method
         self.Perm = Perm
-        self.Test = Test
+        self.Map = Map
         self.VarCompEst = VarCompEst
         self.varCompStd = varCompStd
-
+        self.D = D
+        self.gamma = gamma
+        self.mapping = mapping
+        self.Random_state=Random_state
         self.n = Z.shape[0]
         self.M = Z.shape[1]
 
@@ -82,11 +87,33 @@ class FastKASTComponent:
         """
         Perform feature transformation depending on the request
         """
-        if self.Test=='linear':
+        if self.mapping is not None:
+            ## Use customized mapping function
+            self.Z = mapping(self.Z)
+            
+        if self.Map=='linear':
+            ## Use linear mapping function
             self.Z = (self.Z) / np.sqrt(self.Z.shape[1])
+            
+        elif self.Map=='rbf':
+            ## Use RBF approximation
+            mapping = RBFSampler(gamma=self.gamma,
+                            n_components=self.D,
+                            random_state=self.Random_state)
+            self.mapping = mapping
+            Z = mapping.fit_transform(self.Z)
+            self.Z = (Z) / np.sqrt(Z.shape[1])
+            
+        elif self.Map=='quadOnly':
+            ## Use quadratic only feature map
+            mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
+            self.mapping = mapping
+            Z = mapping.fit_transform(self.Z)
+            self.Z = Z
+            
         
         else:
-            raise NotImplementedError(f"{self.Test} is not implemented") 
+            raise NotImplementedError(f"{self.Map} is not implemented") 
     
     def _compute_svd(self):
         """
@@ -153,6 +180,7 @@ class FastKASTComponent:
         """
         self.results = {}
         self._preprocess_data()
+        self._feature_map()
         self._compute_svd()
         if self.VarCompEst:
             self._estimate_variance_components()
