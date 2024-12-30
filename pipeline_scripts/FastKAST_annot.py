@@ -11,12 +11,6 @@ from estimators import *
 from utils import *
 
 
-
-
-
-
-
-
 def parseargs():  # handle user arguments
     parser = argparse.ArgumentParser(description='isoQTL main script.')
     parser.add_argument('--bfile',
@@ -49,8 +43,7 @@ def parseargs():  # handle user arguments
         '--sw',
         type=int,
         default=2,
-        help=
-        'The superwindow is set to a multiple of the set dimension at both ends, default is 2'
+        help='The superwindow is set to a multiple of the set dimension at both ends, default is 2'
     )
     parser.add_argument('--mc',
                         default='Vanilla',
@@ -59,7 +52,8 @@ def parseargs():  # handle user arguments
     parser.add_argument('--output',
                         default='sim_results',
                         help='Prefix for output files.')
-    parser.add_argument('--annot', default=None, help='Provided annotation file')
+    parser.add_argument('--annot', default=None,
+                        help='Provided annotation file')
     parser.add_argument('--filename', default='sim', help='output file name')
     parser.add_argument('--test',
                         default='nonlinear',
@@ -92,7 +86,6 @@ if __name__ == "__main__":
     fam = bfile + '.fam'
     bim = bfile + '.bim'
 
-
     bimfile = pd.read_csv(bim, delim_whitespace=True, header=None)
     bimfile.columns = ['chr', 'chrpos', 'MAF', 'pos', 'MAJ', 'MIN']
 
@@ -110,14 +103,13 @@ if __name__ == "__main__":
     #     print(gene_annot)
     # else:
     #     gene_annot = pd.read_csv(annot_path, delimiter=' ')
-    
-    gene_annot = np.loadtxt(annot_path,ndmin=2)
+
+    gene_annot = np.loadtxt(annot_path, ndmin=2)
     print(f'Annotation file contains {gene_annot.shape[1]} sets to be tested')
     G = open_bed(bed)
     # G = read_plink1_bin(bed, bim, fam, verbose=False)
     print('Finish lazy loading the genotype matrix')
 
-    
     famfile = pd.read_csv(fam, delim_whitespace=True, header=None)
     columns = ['FID', 'IID', 'Fa', 'Mo', 'Sex', 'Phi']
     famfile.columns = columns
@@ -161,7 +153,7 @@ if __name__ == "__main__":
         count = 0
         for colnum in tqdm(range(0, gene_annot.shape[1])):
             count += 1
-            annot_row=gene_annot[:,colnum]
+            annot_row = gene_annot[:, colnum]
             results.append(paraCompute(annot_row))
             dumpfile(results,
                      savepath,

@@ -6,14 +6,13 @@ from scipy.linalg import pinvh
 import scipy
 
 
-
-
-
-def _scipy_svd(X,compute_uv=False):
+def _scipy_svd(X, compute_uv=False):
     return scipy.linalg.svd(X, full_matrices=False, compute_uv=compute_uv)
 
-def _numpy_svd(X,compute_uv=False, full_matrices=False):
-    return np.linalg.svd(X,full_matrices=full_matrices, compute_uv=compute_uv)
+
+def _numpy_svd(X, compute_uv=False, full_matrices=False):
+    return np.linalg.svd(X, full_matrices=full_matrices, compute_uv=compute_uv)
+
 
 def _inverse_2(X):
     inverse = inv(X.T @ X)
@@ -22,9 +21,10 @@ def _inverse_2(X):
 
 
 def _inverse(X):
-    return pinvh(X.T @ X)  #change from pinv to inv sep 6
+    return pinvh(X.T @ X)  # change from pinv to inv sep 6
     # return pinvh(X.T@X)
-    
+
+
 def _projection(Z, X, P1):
     # Perform (I-X(X^TX)^-1 X^T)Z
     Z = np.array(Z, order='F')
@@ -61,5 +61,3 @@ def _PKP_comp(P, K):
     t1 = scipy.linalg.blas.sgemm(1., P, K)
     t2 = scipy.linalg.blas.sgemm(1., t1, P)
     return t2
-
-
