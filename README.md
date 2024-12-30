@@ -5,7 +5,7 @@
 
 This project integrates both [**FastKAST**](https://www.nature.com/articles/s41467-023-40346-2) and [**QuadKAST**](https://genome.cshlp.org/content/early/2024/08/29/gr.279140.124) to enhance software flexibility and usability. 
 
-Refer to the sub-branches for detailed instructions on each specific method.
+If the users intend to use a data format similar to ours, we further provide detailed instructions on each specific method pipeline in the sub-branches.
 
 ##  **Table of Contents**
 1. [Installation](#Installation) 
