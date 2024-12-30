@@ -9,7 +9,6 @@ from sklearn.preprocessing import PolynomialFeatures
 from FastKAST.Compute.est import getfullComponent, getfullComponentMulti, getfullComponentPerm, getRLComponent, getmleComponent, LRT  # Import your functions
 
 
-
 def estimateSigmasGeneral(y,
                           Xc,
                           X,
@@ -83,7 +82,7 @@ def estimateSigmasGeneral(y,
 
             pvals = [H[0] for H in p]
             states = [H[1] for H in p]
-            
+
             t1 = time.time()
             SKAT_time = t1 - t0
             # print(f'SKAT Perm takes {t1-t0}')

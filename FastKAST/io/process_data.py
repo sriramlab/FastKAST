@@ -11,9 +11,6 @@ from sklearn.preprocessing import PolynomialFeatures
 from bed_reader import open_bed
 
 
-
-
-
 def impute_def(x):
     col_mean = np.nanmean(x, axis=0)
     inds = np.where(np.isnan(x))
@@ -25,7 +22,6 @@ def impute(x):
     imp = SimpleImputer(missing_values=np.nan, strategy='mean')
     x = imp.fit_transform(x)
     return x
-
 
 
 def index_match(start, chrome, wSize, bimfile):
@@ -80,8 +76,6 @@ def flatten_p(pairs, complete=False):
         return (p_min, bindex)
 
 
-
-
 def geno_phen_processing_contig(args):
     '''
     Define the annotation file as a contiguous set of features (SNPs), with start and end index position
@@ -104,18 +98,15 @@ def geno_phen_processing_contig(args):
     fam = bfile + '.fam'
     bim = bfile + '.bim'
 
-
     bimfile = pd.read_csv(bim, delim_whitespace=True, header=None)
     bimfile.columns = ['chr', 'chrpos', 'MAF', 'pos', 'MAJ', 'MIN']
 
-    
-    gene_annot = np.loadtxt(annot_path,ndmin=2)
+    gene_annot = np.loadtxt(annot_path, ndmin=2)
     print(f'Annotation file contains {gene_annot.shape[1]} sets to be tested')
     G = open_bed(bed)
     # G = read_plink1_bin(bed, bim, fam, verbose=False)
     print('Finish lazy loading the genotype matrix')
 
-    
     famfile = pd.read_csv(fam, delim_whitespace=True, header=None)
     columns = ['FID', 'IID', 'Fa', 'Mo', 'Sex', 'Phi']
     famfile.columns = columns
@@ -124,13 +115,12 @@ def geno_phen_processing_contig(args):
     Posits = bimfile.iloc[:, 3].values
 
     # prepare covariate
-    
+
     print(f'covar is {covar}')
     if covar != None:
         covarfile = pd.read_csv(covar, delim_whitespace=True)
         assert covarfile.iloc[:, 0].equals(famfile.FID)
         covarfile = covarfile.iloc[:, 2:]
-
 
     print('Finish preparing the indices')
 
@@ -142,7 +132,7 @@ def geno_phen_processing_contig(args):
         covarfile = covarfile[Yeffect]
     print('Finish loading the phenotype matrix')
 
-    return G, Y, covarfile, Yeffect, gene_annot, 
+    return G, Y, covarfile, Yeffect, gene_annot,
 
     # filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
     filename = args.filename
@@ -150,7 +140,7 @@ def geno_phen_processing_contig(args):
         count = 0
         for colnum in tqdm(range(0, gene_annot.shape[1])):
             count += 1
-            annot_row=gene_annot[:,colnum]
+            annot_row = gene_annot[:, colnum]
             results.append(paraCompute(annot_row))
             dumpfile(results,
                      savepath,
@@ -158,4 +148,3 @@ def geno_phen_processing_contig(args):
                      overwrite=True)
             if count > 1:
                 os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
-    

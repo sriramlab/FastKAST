@@ -3,7 +3,6 @@ import numpy as np
 import numpy as np
 
 
-
 def standerr(U, y, Sii, UTy, g, e):
     L11 = np.sum(np.square(UTy.flatten()) * np.square(Sii) / (g * Sii + e)**3)
     L22 = np.sum(np.square(y - U @ UTy).flatten() / (e)**3) + np.sum(
@@ -17,24 +16,27 @@ def standerr(U, y, Sii, UTy, g, e):
 
 
 def standerr_dev(U, y, Sii, UTy, g, e):
-    
+
     if cov:
         n = len(UTy)
-        assert n>10
+        assert n > 10
     else:
         n = len(y)
-    print(g,e,n)
+    print(g, e, n)
     # if isinstance(cov,int):
     #     n = len(y) - cov
     # else:
     #     n = len(y)
     nulity = max(0, n - len(Sii))
-    L11 = -0.5*(np.sum(np.square(Sii) / (g * Sii + e)**2))+np.sum(np.square(UTy.flatten()) * np.square(Sii) / (g * Sii + e)**3) 
-    L22 = -0.5*(np.sum(1. / (g * Sii + e)**2)+nulity*1./e**2) + np.sum(np.square(UTy.flatten()) / (g * Sii + e)**3) +  np.sum(np.square((y - U @ UTy).flatten()) / e**3)
+    L11 = -0.5*(np.sum(np.square(Sii) / (g * Sii + e)**2)) + \
+        np.sum(np.square(UTy.flatten()) * np.square(Sii) / (g * Sii + e)**3)
+    L22 = -0.5*(np.sum(1. / (g * Sii + e)**2)+nulity*1./e**2) + np.sum(np.square(UTy.flatten()
+                                                                                 ) / (g * Sii + e)**3) + np.sum(np.square((y - U @ UTy).flatten()) / e**3)
     # print((np.square(UTy.flatten())).shape)
     # print(((g * Sii + e)**3).shape)
     # print(f'L22 is {L22}')
-    L12 = -0.5*np.sum(Sii/np.square(g * Sii + e))+np.sum(np.square(UTy.flatten()) * Sii / (g * Sii + e)**3)
+    L12 = -0.5*np.sum(Sii/np.square(g * Sii + e)) + \
+        np.sum(np.square(UTy.flatten()) * Sii / (g * Sii + e)**3)
     # print(np.sum(np.square(UTy.flatten()) * Sii / (g * Sii + e)**3))
     # print(-0.5*np.sum(Sii/(g * Sii + e)**2))
     L = np.array([[L11, L12], [L12, L22]])
@@ -44,7 +46,6 @@ def standerr_dev(U, y, Sii, UTy, g, e):
     gerr = np.sqrt(cov[0][0])
     eerr = np.sqrt(cov[1][1])
     return [gerr, eerr]
-
 
 
 def standerr_dev_cov(Sii, yt, LLadd1, n, g, e):
@@ -56,9 +57,12 @@ def standerr_dev_cov(Sii, yt, LLadd1, n, g, e):
     # print(f'Sii: {Sii}')
     # print(f'g: {g}')
     # print(f'e: {e}')
-    L11 = -0.5*(np.sum(np.square(Sii) / np.square(g * Sii + e)))+np.sum(np.square(yt.flatten()) * np.square(Sii) / (g * Sii + e)**3) 
-    L22 = -0.5*(np.sum(1. / np.square(g * Sii + e))+nulity*1./e**2) + np.sum(np.square(yt.flatten()) / (g * Sii + e)**3) - np.sum(np.square(yt.flatten())/e**3) +  LLadd1 / e**3
-    L12 = -0.5*np.sum(Sii / np.square(g * Sii + e))+np.sum(np.square(yt.flatten()) * Sii / (g * Sii + e)**3)
+    L11 = -0.5*(np.sum(np.square(Sii) / np.square(g * Sii + e))) + \
+        np.sum(np.square(yt.flatten()) * np.square(Sii) / (g * Sii + e)**3)
+    L22 = -0.5*(np.sum(1. / np.square(g * Sii + e))+nulity*1./e**2) + np.sum(np.square(
+        yt.flatten()) / (g * Sii + e)**3) - np.sum(np.square(yt.flatten())/e**3) + LLadd1 / e**3
+    L12 = -0.5*np.sum(Sii / np.square(g * Sii + e)) + \
+        np.sum(np.square(yt.flatten()) * Sii / (g * Sii + e)**3)
     # print(np.sum(np.square(UTy.flatten()) * Sii / (g * Sii + e)**3))
     # print(-0.5*np.sum(Sii/(g * Sii + e)**2))
     L = np.array([[L11, L12], [L12, L22]])
@@ -70,5 +74,3 @@ def standerr_dev_cov(Sii, yt, LLadd1, n, g, e):
     gerr = np.sqrt(cov[0][0])
     eerr = np.sqrt(cov[1][1])
     return [gerr, eerr]
-
-

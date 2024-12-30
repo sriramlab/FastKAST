@@ -9,7 +9,7 @@ import fastlmmclib.quadform as qf
 from chi2comb import chi2comb_cdf, ChiSquared
 
 
-############### p-value aggregation ############### 
+############### p-value aggregation ###############
 
 def CCT(pvals, ws=None):
     N = len(pvals)
@@ -20,8 +20,7 @@ def CCT(pvals, ws=None):
     return pval
 
 
-
-############### Score Testing ############### 
+############### Score Testing ###############
 
 def score_test(S):
     # N = Z.shape[0]
@@ -44,11 +43,12 @@ def score_test2(sq_sigma_e0, Q, S, decompose=True, center=False, multi=False, DE
     chi2s = [ChiSquared(Phi[i], ncents[i], dofs[i]) for i in range(k)]
     # t0 = time.time()
     if multi:
-        ps=[]
-        errors=[]
-        infos=[]
-        for K in tqdm(range(len(Qe)),desc="Processing score statistics"):
-            p, error, info = chi2comb_cdf(Qe[K], chi2s, 0, lim=int(1e8), atol=1e-13)
+        ps = []
+        errors = []
+        infos = []
+        for K in tqdm(range(len(Qe)), desc="Processing score statistics"):
+            p, error, info = chi2comb_cdf(
+                Qe[K], chi2s, 0, lim=int(1e8), atol=1e-13)
             ps.append(p)
             errors.append(error)
             infos.append(info)
@@ -64,45 +64,49 @@ def score_test2(sq_sigma_e0, Q, S, decompose=True, center=False, multi=False, DE
         # t1 = time.time()
         return (1 - p, error)
 
-def score_test_qf(sq_sigma_e0, Q, S, decompose=True, center=False,multi=False):
+
+def score_test_qf(sq_sigma_e0, Q, S, decompose=True, center=False, multi=False):
     Qe = (Q / (sq_sigma_e0))
     if multi:
-        ps=[]
-        for K in tqdm(range(len(Qe)),desc="Processing score statistics"):
-            stats=qf.qf(Qe[K], S,sigma=1,lim=int(1e8),acc = 1e-15)
+        ps = []
+        for K in tqdm(range(len(Qe)), desc="Processing score statistics"):
+            stats = qf.qf(Qe[K], S, sigma=1, lim=int(1e8), acc=1e-15)
             p = stats[0]
             ps.append(p)
         ps = np.array(ps)
         return (ps)
     else:
-        stats=qf.qf(Qe, S,sigma=1,lim=int(1e8),acc = 1e-15)
+        stats = qf.qf(Qe, S, sigma=1, lim=int(1e8), acc=1e-15)
         p = stats[0]
         return (p)
-    
 
-############### Likelihood Ratio Testing ############### 
-   
+
+############### Likelihood Ratio Testing ###############
+
 def mix_chi_fit(weights, x, phi, topk):
     '''
     Used for LRT -- fitting the mixture of chi-square given phi/pi
     '''
     samples = len(x)
     a, d = weights
-    
+
     topk_samples = int(topk*samples)
     quantiles = np.linspace(0, 1, samples)[-topk_samples:] - 0.5/samples
-    
+
     # theoretical_dist = mix_chi_quantile(quantiles,phi, a, d)
-    
+
     top_empirical = np.sort(x)[-topk_samples:]
     # print(f'empirical: {top_empirical}')
-    
-    top_theoretical = np.array([mix_chi_quantile(q, phi, a, d) for q in quantiles])
+
+    top_theoretical = np.array(
+        [mix_chi_quantile(q, phi, a, d) for q in quantiles])
     # print(f'theoretical: {top_theoretical}')
 
-    loss = np.sum(np.square(np.log(top_empirical+1e-10) - np.log(top_theoretical+1e-10)))
+    loss = np.sum(np.square(np.log(top_empirical+1e-10) -
+                  np.log(top_theoretical+1e-10)))
     # print(f'loss is {loss}')
     return loss
+
 
 def mix_chi_quantile(q, phi, a, d):
     """
@@ -121,9 +125,9 @@ def mix_chi_quantile(q, phi, a, d):
     else:
         q_adj = (q - phi) / (1 - phi)
         return a * chi2.ppf(q_adj, d)
-    
-    
-def fit_null(x,top_ratio=0.1):
+
+
+def fit_null(x, top_ratio=0.1):
     '''
     Using LRT permutation statistics to perform curve fitting
     Args:
@@ -132,13 +136,9 @@ def fit_null(x,top_ratio=0.1):
     '''
     x = np.array(x)
     bounds = [(1e-2, 100), (1e-2, 100)]
-    top=int(top_ratio*len(x))
-    phi=np.mean(x<=1e-6)
-    init_x = [1e0,1e0]
-    result = minimize(mix_chi_fit, init_x, args=(np.sort(x), phi, top_ratio), bounds=bounds, method="L-BFGS-B",options={'gtol': 1e-6, 'maxiter':1e5})
+    top = int(top_ratio*len(x))
+    phi = np.mean(x <= 1e-6)
+    init_x = [1e0, 1e0]
+    result = minimize(mix_chi_fit, init_x, args=(np.sort(x), phi, top_ratio),
+                      bounds=bounds, method="L-BFGS-B", options={'gtol': 1e-6, 'maxiter': 1e5})
     return result, phi
-
-    
-    
-
-

@@ -13,18 +13,17 @@ from FastKAST.VarComp.se_est import *
 from FastKAST.VarComp.var_est import *
 
 
-
 def getfullComponentMulti(X,
-                         Z,
-                         y,
-                         theta=False,
-                         dtype='quant',
-                         center=True,
-                         method='Numpy',
-                         Perm=10,
-                         Test='nonlinear',
-                         VarCompEst=False,
-                         varCompStd=False):
+                          Z,
+                          y,
+                          theta=False,
+                          dtype='quant',
+                          center=True,
+                          method='Numpy',
+                          Perm=10,
+                          Test='nonlinear',
+                          VarCompEst=False,
+                          varCompStd=False):
     '''
     This function provide a multi-trait version for QuadKAST computation.
     Detailed processing scheme
@@ -41,18 +40,18 @@ def getfullComponentMulti(X,
     n = Z.shape[0]
     M = Z.shape[1]
     # print(f'Z here is {np.mean(Z,axis=0)}; {np.std(Z,axis=0)}')
-    nan_num = np.sum(np.isnan(y),axis=0)
+    nan_num = np.sum(np.isnan(y), axis=0)
     print(f'nan_num is {nan_num}')
     y = np.nan_to_num(y)
     if center:
-        if X is None or X.size==0:
+        if X is None or X.size == 0:
             X = np.ones((n, 1))
         else:
             X = np.concatenate((np.ones((n, 1)), X), axis=1)
-    
-    if X is None or X.size==0:
+
+    if X is None or X.size == 0:
         k = 0
-        Q = np.sum(np.square(y.T @ Z),axis=1) ## K vector 
+        Q = np.sum(np.square(y.T @ Z), axis=1)  # K vector
         y1 = y.copy()
     else:
         k = X.shape[1]
@@ -61,14 +60,15 @@ def getfullComponentMulti(X,
         # Z = left__projection(Z,X)
         # Z = _projection_QR(Z,X,P1)
         Z = _projection(Z, X, P1)
-        Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z),axis=1) ## K vector
-        B1, _, _ = _numpy_svd(X,compute_uv=True) ## N_eff x N
-        y1 = B1.T@y ## N_eff x K
+        Q = np.sum(np.square(y.T @ Z - y.T @ X @
+                   P1 @ X.T @ Z), axis=1)  # K vector
+        B1, _, _ = _numpy_svd(X, compute_uv=True)  # N_eff x N
+        y1 = B1.T@y  # N_eff x K
     # Z = Z - X@P1@(X.T@Z)
     t1 = time.time()
     # print(f'Z operation takes {t1-t0}')
     if VarCompEst:
-        U,S,_ = _numpy_svd(Z,compute_uv=True)
+        U, S, _ = _numpy_svd(Z, compute_uv=True)
     else:
         S = _numpy_svd(Z)
     # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
@@ -81,55 +81,57 @@ def getfullComponentMulti(X,
     # t1 = time.time()
     S = np.square(S)
     S[S <= 1e-6] = 0
-    filtered=np.nonzero(S)[0]
+    filtered = np.nonzero(S)[0]
     S = S[filtered]
 
     results = {}
     if VarCompEst:
         print(f'Var comp for multi-trait version hasnt implemented yet')
         # print(U.shape)
-        U = U[:,filtered]
+        U = U[:, filtered]
         # print(U.shape,S.shape)
         if X is None:
-            var_est=VarComponentEst(S,U,y)
+            var_est = VarComponentEst(S, U, y)
         else:
             yt = U.T@y
             if varCompStd:
                 # standardized hertability for sigma_quad^2
-                var_est=VarComponentEst_Cov_std(S,yt,y1,y) # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'): Don't use this version unless you know what you are doing
+                # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'): Don't use this version unless you know what you are doing
+                var_est = VarComponentEst_Cov_std(S, yt, y1, y)
             else:
-                var_est=VarComponentEst_Cov(S,yt,y1,y) # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
-        sigma2_gxg=var_est[1]
-        sigma2_e=var_est[2]
-        trace=np.sum(S) # compute the trace of phi phi.T
-        sumK = np.sum(np.sum(Z,axis=0)**2) # compute the sum(Phi Phi.T)
+                # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
+                var_est = VarComponentEst_Cov(S, yt, y1, y)
+        sigma2_gxg = var_est[1]
+        sigma2_e = var_est[2]
+        trace = np.sum(S)  # compute the trace of phi phi.T
+        sumK = np.sum(np.sum(Z, axis=0)**2)  # compute the sum(Phi Phi.T)
         # print(f'trace is {trace}; sum K is {sumK}')
-        results['varcomp']=var_est
+        results['varcomp'] = var_est
         print(f'Var est is: \n {var_est}')
     t0 = time.time()
     #     S = np.square(SVD[1])
     ts0 = time.time()
-    
+
     # print(f'S raw is {S}')
-    
+
     ts1 = time.time()
     # k = int(np.sum(inner1d(P1,X)))
     t1 = time.time()
-    
+
     if center:
         # print('calculate centered y')
         # sq_sigma_e0 = (y.T @ y - y.T @ X @ P1 @ (X.T @ y))[0] / (n - k)
         yTXPX = y.T @ X @ P1 @ X.T
-        sq_sigma_e0_num=np.sum(y*y,axis=0) - np.sum(yTXPX*(y.T),axis=1)
-        sq_sigma_e0_den=(n-k-nan_num) 
-        sq_sigma_e0 = sq_sigma_e0_num / sq_sigma_e0_den ## K vector
+        sq_sigma_e0_num = np.sum(y*y, axis=0) - np.sum(yTXPX*(y.T), axis=1)
+        sq_sigma_e0_den = (n-k-nan_num)
+        sq_sigma_e0 = sq_sigma_e0_num / sq_sigma_e0_den  # K vector
         # print(f'sq_sigma_e0: {sq_sigma_e0}')
         # sq_sigma_e0_perm = (yperm.T@yperm - yperm.T@X@P1@(X.T@yperm))[0]/(n-k)
     else:
-        sq_sigma_e0 = np.sum(y*y,axis=0) / (n-nan_num) ## K vector
+        sq_sigma_e0 = np.sum(y*y, axis=0) / (n-nan_num)  # K vector
     # t0 = time.time()
     # print(f'Y is {y}, {np.sum(y)}')
-    p_value1=score_test_qf(sq_sigma_e0, Q, S, center=center,multi=True)
+    p_value1 = score_test_qf(sq_sigma_e0, Q, S, center=center, multi=True)
     # p_value1 = score_test2(sq_sigma_e0, Q, S, center=center,multi=True)
     # print(f'pval is {p_value1}')
     if isinstance(Perm, int) and Perm > 0:
@@ -148,10 +150,8 @@ def getfullComponentMulti(X,
 
         # results['pval']=p_list
         # return results
-    results['pvals']=p_value1 ## notice the key name change here
+    results['pvals'] = p_value1  # notice the key name change here
     return results
-
-
 
 
 def getfullComponentPerm(X,
@@ -171,14 +171,14 @@ def getfullComponentPerm(X,
     n = Z.shape[0]
     M = Z.shape[1]
     # print(f'Z here is {np.mean(Z,axis=0)}; {np.std(Z,axis=0)}')
-    
+
     if center:
-        if X is None or X.size==0:
+        if X is None or X.size == 0:
             X = np.ones((n, 1))
         else:
             X = np.concatenate((np.ones((n, 1)), X), axis=1)
     y = y.reshape(-1, 1)
-    if X is None or X.size==0:
+    if X is None or X.size == 0:
         k = 0
         Q = np.sum(np.square(y.T @ Z))
         y1 = y.copy()
@@ -190,14 +190,14 @@ def getfullComponentPerm(X,
         # Z = _projection_QR(Z,X,P1)
         Z = _projection(Z, X, P1)
         Q = np.sum(np.square(y.T @ Z - y.T @ X @ P1 @ X.T @ Z))
-        B1, _, _ = _numpy_svd(X,compute_uv=True)
+        B1, _, _ = _numpy_svd(X, compute_uv=True)
         y1 = B1.T@y
     # Z = Z - X@P1@(X.T@Z)
     t1 = time.time()
     # print(f'Z operation takes {t1-t0}')
     t0 = time.time()
     if VarCompEst:
-        U,S,_ = _numpy_svd(Z,compute_uv=True)
+        U, S, _ = _numpy_svd(Z, compute_uv=True)
     else:
         S = _numpy_svd(Z)
     # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
@@ -210,36 +210,38 @@ def getfullComponentPerm(X,
     # t1 = time.time()
     S = np.square(S)
     S[S <= 1e-6] = 0
-    filtered=np.nonzero(S)[0]
+    filtered = np.nonzero(S)[0]
     S = S[filtered]
 
     results = {}
     if VarCompEst:
         # print(U.shape)
-        U = U[:,filtered]
+        U = U[:, filtered]
         # print(U.shape,S.shape)
         if X is None:
-            var_est=VarComponentEst(S,U,y)
+            var_est = VarComponentEst(S, U, y)
         else:
             yt = U.T@y
             if varCompStd:
                 # standardized hertability for sigma_quad^2
-                var_est=VarComponentEst_Cov_std(S,yt,y1,y) # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
+                # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
+                var_est = VarComponentEst_Cov_std(S, yt, y1, y)
             else:
-                var_est=VarComponentEst_Cov(S,yt,y1,y) # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
-        sigma2_gxg=var_est[1]
-        sigma2_e=var_est[2]
-        trace=np.sum(S) # compute the trace of phi phi.T
-        sumK = np.sum(np.sum(Z,axis=0)**2) # compute the sum(Phi Phi.T)
+                # def VarComponentEst_Cov(S, yt, y1, y, dtype='quant'):
+                var_est = VarComponentEst_Cov(S, yt, y1, y)
+        sigma2_gxg = var_est[1]
+        sigma2_e = var_est[2]
+        trace = np.sum(S)  # compute the trace of phi phi.T
+        sumK = np.sum(np.sum(Z, axis=0)**2)  # compute the sum(Phi Phi.T)
         print(f'trace is {trace}; sum K is {sumK}')
-        results['varcomp']=var_est
+        results['varcomp'] = var_est
         print(f'Var est is: \n {var_est}')
     t0 = time.time()
     #     S = np.square(SVD[1])
     ts0 = time.time()
-    
+
     # print(f'S raw is {S}')
-    
+
     ts1 = time.time()
     # k = int(np.sum(inner1d(P1,X)))
     t1 = time.time()
@@ -252,9 +254,9 @@ def getfullComponentPerm(X,
         sq_sigma_e0 = y.T @ y / n
     # t0 = time.time()
     # print(f'Y is {y}, {np.sum(y)}')
-    
+
     p_value1 = score_test2(sq_sigma_e0, Q, S, center=center)
-    
+
     if Perm:
         p_list = [p_value1]
         for state in range(Perm):
@@ -268,12 +270,11 @@ def getfullComponentPerm(X,
                                         center=center)
             p_list.append(p_value1_perm)
 
-        results['pval']=p_list
+        results['pval'] = p_list
         print(f'results is {results}')
         return results
-    results['pval']=p_value1
+    results['pval'] = p_value1
     return results
-
 
 
 def getfullComponent(X, Z, y, dtype='quant', center=False, method='Scipy'):
@@ -300,7 +301,7 @@ def getfullComponent(X, Z, y, dtype='quant', center=False, method='Scipy'):
         Z = _projection(Z, X, P1)
         t0 = time.time()
         print(f'Z operation takes {t1-t0}')
-    
+
         S = _numpy_svd(Z)
         # S = scipy.linalg.svd(Z, full_matrices=False, compute_uv=False)
         t1 = time.time()
@@ -343,7 +344,6 @@ def getfullComponent(X, Z, y, dtype='quant', center=False, method='Scipy'):
     print(f'p value is {p_value1}, p_value1_perm is {p_value1_perm}')
     # print('e is {}'.format(sq_sigma_e0))
     return [p_value1, p_value1_perm]
-
 
 
 def getRLComponent(X,
@@ -426,10 +426,6 @@ def getRLComponent(X,
     return [p_value1, p_value1_perm]
 
 
-
-
-
-
 def getmleComponent(X, K, y, center=False):
     # delta is the initial guess of delta value
     t0 = time.time()
@@ -491,30 +487,27 @@ def getmleComponent(X, K, y, center=False):
     return [p_value1, p_value_perm]
 
 
-
-   
 def LRT(Z, y, dtype='quant', Perm=0, Seed=None):
     '''
     ######### Boyang: Simple LRT without the inclusion of covariates #########
-    
+
     :Z: input testing data
     :y: original trait. Shape (N)
     Perm: number of permutations (default is 0)
     '''
     # delta is the initial guess of delta value
     np.random.seed(Seed)
-    num_iter=1 + Perm
+    num_iter = 1 + Perm
     n = y.shape[0]
-    
-    U,S,_ = _numpy_svd(Z,compute_uv=True)
+
+    U, S, _ = _numpy_svd(Z, compute_uv=True)
     # print(f'U shape is {U.shape}; S shape is {S.shape}')
 
     S = np.square(S)
     S[S <= 1e-6] = 0
-    filtered=np.nonzero(S)[0]
+    filtered = np.nonzero(S)[0]
     S = S[filtered]
 
-    
     y = y.copy()
     # print(f'U shape: {U.shape}; y shape: {y.shape}')
     yt = U.T@y
@@ -524,24 +517,26 @@ def LRT(Z, y, dtype='quant', Perm=0, Seed=None):
         if it > 0:
             y = np.random.permutation(y)
             yt = U.T@y
-    
-        LLadd1 = np.sum(np.square(y - U @ yt)) ## sum_{i=1}^{N-K} yt_i^2
-    
-        optimizer = (minimize(_lik, [0], args=(n, S, yt, LLadd1), method = 'Nelder-Mead', options={'maxiter':5000}))
+
+        LLadd1 = np.sum(np.square(y - U @ yt))  # sum_{i=1}^{N-K} yt_i^2
+
+        optimizer = (minimize(_lik, [0], args=(
+            n, S, yt, LLadd1), method='Nelder-Mead', options={'maxiter': 5000}))
         logdelta = optimizer.x[0]
-    
+
         fun = -1 * optimizer.fun
-    
+
         delta = np.exp(logdelta)
         h = 1 / (delta + 1)  # heritability
         # print(h)
-        
+
         sq_sigma_g = (sum(np.square(yt.flatten()) /
-                              (S + delta)) + LLadd1 / delta) / n
-        
+                          (S + delta)) + LLadd1 / delta) / n
+
         sq_sigma_e = delta * sq_sigma_g
-    
-        L1 = -_lik(logdelta, n, S, yt, LLadd1) + 0.5*n*np.log(n) - 0.5 * n * np.log(2*np.pi) - 0.5*n
+
+        L1 = -_lik(logdelta, n, S, yt, LLadd1) + 0.5*n * \
+            np.log(n) - 0.5 * n * np.log(2*np.pi) - 0.5*n
         # print(f'L1: {L1}')
         yTy = (y.T @ y)[0]
         if dtype == 'quant':
@@ -549,10 +544,10 @@ def LRT(Z, y, dtype='quant', Perm=0, Seed=None):
         else:
             mu0 = np.sum(y) / n
             sq_sigma_e0 = mu0 * (1 - mu0)
-    
+
         L0 = -0.5 * (n * np.log(sq_sigma_e0) +
-                     n)  - 0.5 * n * np.log(2*np.pi)
+                     n) - 0.5 * n * np.log(2*np.pi)
 
         LRT_stats.append(L1-L0[0])
-        
+
     return np.array(LRT_stats)

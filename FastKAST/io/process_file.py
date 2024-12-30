@@ -4,10 +4,6 @@ import glob
 # from numba_stats import norm
 
 
-
-
-
-
 def dumpfile(data, path, filename, overwrite=False):
     isdir = os.path.isdir(path)
     if not isdir:
@@ -40,4 +36,3 @@ def fileExist(path, filename):
     if not isfile:
         return False
     return True
-

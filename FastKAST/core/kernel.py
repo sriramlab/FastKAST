@@ -2,7 +2,6 @@ import numpy as np
 from numba import jit
 
 
-
 @jit(nopython=True)
 def sin_cos(X, method='sin'):
     if method == 'sin':
@@ -13,32 +12,31 @@ def sin_cos(X, method='sin'):
 
 
 def direct_self(geno_matrix_in):
-    N=geno_matrix_in.shape[0]
-    M=geno_matrix_in.shape[1]
+    N = geno_matrix_in.shape[0]
+    M = geno_matrix_in.shape[1]
     D = int((M*(M+1))/2)
     exact = np.zeros((N, D))
     s = 0
     for i in range(M):
         for j in range(i, M):
-            feature = geno_matrix_in[:,i]*geno_matrix_in[:,j]
-            exact[:,s] = feature
+            feature = geno_matrix_in[:, i]*geno_matrix_in[:, j]
+            exact[:, s] = feature
             s += 1
     exact_standard = stats.zscore(exact)
 
     return exact_standard
 
 
-
 def direct_noself(geno_matrix_in):
-    N=geno_matrix_in.shape[0]
-    M=geno_matrix_in.shape[1]
+    N = geno_matrix_in.shape[0]
+    M = geno_matrix_in.shape[1]
     D = int((M*(M-1))/2)
     exact = np.zeros((N, D))
     s = 0
     for i in range(M):
         for j in range(i+1, M):
-            feature = geno_matrix_in[:,i]*geno_matrix_in[:,j]
-            exact[:,s] = feature
+            feature = geno_matrix_in[:, i]*geno_matrix_in[:, j]
+            exact[:, s] = feature
             s += 1
     exact_standard = stats.zscore(exact)
 

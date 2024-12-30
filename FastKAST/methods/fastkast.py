@@ -14,6 +14,7 @@ from FastKAST.core.optim import *
 from FastKAST.VarComp.se_est import *
 from FastKAST.VarComp.var_est import *
 
+
 class FastKASTComponent:
     """
     Class for performing FastKAST component analysis.
@@ -22,8 +23,8 @@ class FastKASTComponent:
     including variance component estimation and p-value calculation.
     """
 
-    def __init__(self, X, Z, y, theta=False, dtype='quant', center=True, 
-                 method='Numpy', Perm=10, MapFunc='linear', 
+    def __init__(self, X, Z, y, theta=False, dtype='quant', center=True,
+                 method='Numpy', Perm=10, MapFunc='linear',
                  VarCompEst=False, varCompStd=False, D=10, gamma=0.1, Random_state=0, mapping=None):
         """
         Initialize the FastKASTComponent object.
@@ -55,7 +56,7 @@ class FastKASTComponent:
         self.D = D
         self.gamma = gamma
         self.mapping = mapping
-        self.Random_state=Random_state
+        self.Random_state = Random_state
         self.n = Z.shape[0]
         self.M = Z.shape[1]
 
@@ -79,42 +80,43 @@ class FastKASTComponent:
             P1 = _inverse(self.X)
             self.P1 = P1
             self.Z = _projection(self.Z, self.X, P1)
-            self.Q = np.sum(np.square(self.y.T @ self.Z - self.y.T @ self.X @ P1 @ self.X.T @ self.Z))
+            self.Q = np.sum(np.square(self.y.T @ self.Z -
+                            self.y.T @ self.X @ P1 @ self.X.T @ self.Z))
             B1, _, _ = _numpy_svd(self.X, compute_uv=True)
             self.y1 = B1.T @ self.y
-    
+
     def _feature_map(self):
         """
         Perform feature transformation depending on the request
         """
         if self.mapping is not None:
-            ## Use customized mapping function
+            # Use customized mapping function
             self.Z = self.mapping(self.Z)
-            
-        if self.MapFunc=='linear':
-            ## Use linear mapping function
+
+        if self.MapFunc == 'linear':
+            # Use linear mapping function
             self.Z = (self.Z) / np.sqrt(self.Z.shape[1])
-            
-        elif self.MapFunc=='rbf':
-            ## Use RBF approximation
+
+        elif self.MapFunc == 'rbf':
+            # Use RBF approximation
             mapping = RBFSampler(gamma=self.gamma,
-                            n_components=self.D,
-                            random_state=self.Random_state)
+                                 n_components=self.D,
+                                 random_state=self.Random_state)
             self.mapping = mapping
             Z = self.mapping.fit_transform(self.Z)
             self.Z = (Z) / np.sqrt(Z.shape[1])
-            
-        elif self.MapFunc=='quadOnly':
-            ## Use quadratic only feature map
-            mapping = PolynomialFeatures((2, 2),interaction_only=True,include_bias=False)
+
+        elif self.MapFunc == 'quadOnly':
+            # Use quadratic only feature map
+            mapping = PolynomialFeatures(
+                (2, 2), interaction_only=True, include_bias=False)
             self.mapping = mapping
             Z = mapping.fit_transform(self.Z)
             self.Z = Z
-            
-        
+
         else:
-            raise NotImplementedError(f"{self.MapFunc} is not implemented") 
-    
+            raise NotImplementedError(f"{self.MapFunc} is not implemented")
+
     def _compute_svd(self):
         """
         Compute singular value decomposition of the projected genotype matrix.
@@ -140,13 +142,15 @@ class FastKASTComponent:
             else:
                 yt = self.U.T @ self.y
                 if self.varCompStd:
-                    var_est = VarComponentEst_Cov_std(self.S, yt, self.y1, self.y) 
+                    var_est = VarComponentEst_Cov_std(
+                        self.S, yt, self.y1, self.y)
                 else:
-                    var_est = VarComponentEst_Cov(self.S, yt, self.y1, self.y) 
+                    var_est = VarComponentEst_Cov(self.S, yt, self.y1, self.y)
             self.sigma2_gxg = var_est[1]
             self.sigma2_e = var_est[2]
             self.trace = np.sum(self.S)  # compute the trace of phi phi.T
-            self.sumK = np.sum(np.sum(self.Z, axis=0)**2)  # compute the sum(Phi Phi.T)
+            # compute the sum(Phi Phi.T)
+            self.sumK = np.sum(np.sum(self.Z, axis=0)**2)
             self.results['varcomp'] = var_est
 
     def _compute_p_value(self):
@@ -155,20 +159,25 @@ class FastKASTComponent:
         """
         P1 = self.P1
         if self.center:
-            sq_sigma_e0 = (self.y.T @ self.y - self.y.T @ self.X @ P1 @ (self.X.T @ self.y))[0] / (self.n - self.k)
+            sq_sigma_e0 = (self.y.T @ self.y - self.y.T @ self.X @
+                           P1 @ (self.X.T @ self.y))[0] / (self.n - self.k)
         else:
             sq_sigma_e0 = self.y.T @ self.y / self.n
 
-        self.p_value1 = score_test2(sq_sigma_e0, self.Q, self.S, center=self.center)
+        self.p_value1 = score_test2(
+            sq_sigma_e0, self.Q, self.S, center=self.center)
 
         if self.Perm:
             p_list = [self.p_value1]
             for state in range(self.Perm):
-                shuff_idx = np.random.RandomState(seed=state).permutation(self.n)
-                yperm = (self.y - (self.X @ (P1 @ (self.X.T @ self.y))))[shuff_idx]
+                shuff_idx = np.random.RandomState(
+                    seed=state).permutation(self.n)
+                yperm = (
+                    self.y - (self.X @ (P1 @ (self.X.T @ self.y))))[shuff_idx]
                 Qperm = np.sum(np.square(yperm.T @ self.Z))
                 sq_sigma_e0_perm = (yperm.T @ yperm)[0] / (self.n - self.k)
-                p_value1_perm = score_test2(sq_sigma_e0_perm, Qperm, self.S, center=self.center)
+                p_value1_perm = score_test2(
+                    sq_sigma_e0_perm, Qperm, self.S, center=self.center)
                 p_list.append(p_value1_perm)
             self.results['pval'] = p_list
         else:
@@ -186,9 +195,8 @@ class FastKASTComponent:
             self._estimate_variance_components()
         self._compute_p_value()
         return self.results
-    
-    
-    
+
+
 class FastKASTComponentMulti:
     """
     Class for performing FastKAST component analysis for multiple traits.
@@ -197,8 +205,8 @@ class FastKASTComponentMulti:
     including variance component estimation and p-value calculation for multiple traits.
     """
 
-    def __init__(self, X, Z, y, theta=False, dtype='quant', center=True, 
-                 method='Numpy', Perm=10, Test='linear', 
+    def __init__(self, X, Z, y, theta=False, dtype='quant', center=True,
+                 method='Numpy', Perm=10, Test='linear',
                  VarCompEst=False, varCompStd=False):
         """
         Initialize the FastKASTComponentMulti object.
@@ -255,7 +263,8 @@ class FastKASTComponentMulti:
             P1 = _inverse(self.X)
             self.P1 = P1
             self.Z = _projection(self.Z, self.X, P1)
-            self.Q = np.sum(np.square(self.y.T @ self.Z - self.y.T @ self.X @ P1 @ self.X.T @ self.Z), axis=1)  # K vector
+            self.Q = np.sum(np.square(self.y.T @ self.Z - self.y.T @
+                            self.X @ P1 @ self.X.T @ self.Z), axis=1)  # K vector
             B1, _, _ = _numpy_svd(self.X, compute_uv=True)
             self.y1 = B1.T @ self.y
 
@@ -263,11 +272,11 @@ class FastKASTComponentMulti:
         """
         Perform feature transformation depending on the request
         """
-        if self.Test=='linear':
+        if self.Test == 'linear':
             self.Z = (self.Z) / np.sqrt(self.Z.shape[1])
-        
+
         else:
-            raise NotImplementedError(f"{self.Test} is not implemented") 
+            raise NotImplementedError(f"{self.Test} is not implemented")
 
     def _compute_svd(self):
         """
@@ -299,13 +308,16 @@ class FastKASTComponentMulti:
         P1 = self.P1
         if self.center:
             yTXPX = self.y.T @ self.X @ P1 @ self.X.T
-            sq_sigma_e0_num = np.sum(self.y * self.y, axis=0) - np.sum(yTXPX * (self.y.T), axis=1)
+            sq_sigma_e0_num = np.sum(
+                self.y * self.y, axis=0) - np.sum(yTXPX * (self.y.T), axis=1)
             sq_sigma_e0_den = (self.n - self.k - self.nan_num)
             self.sq_sigma_e0 = sq_sigma_e0_num / sq_sigma_e0_den  # K vector
         else:
-            self.sq_sigma_e0 = np.sum(self.y * self.y, axis=0) / (self.n - self.nan_num)  # K vector
+            self.sq_sigma_e0 = np.sum(
+                self.y * self.y, axis=0) / (self.n - self.nan_num)  # K vector
 
-        self.p_vals = score_test_qf(self.sq_sigma_e0, self.Q, self.S, center=self.center, multi=True)
+        self.p_vals = score_test_qf(
+            self.sq_sigma_e0, self.Q, self.S, center=self.center, multi=True)
 
         # Note: Permutation testing for multiple traits is not currently implemented.
 

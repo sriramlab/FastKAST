@@ -50,17 +50,18 @@ def test_format_getfullComponentMulti(X, Z, y):
     results = getfullComponentMulti(X, Z, y, Perm=False)
     assert "pvals" in results
     assert isinstance(results["pvals"][0], float)
-    assert len(results["pvals"])==5
+    assert len(results["pvals"]) == 5
+
 
 @pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(2)])
-def test_format_LRT(X, Z,y):
+def test_format_LRT(X, Z, y):
     """
     Tests the Likelihood ratio test (LRT) function.
     """
     results = LRT(Z, y, Perm=5)
     assert isinstance(results[0], float)
-    assert len(results)==6
-    
+    assert len(results) == 6
+
 
 # @pytest.mark.parametrize("X, Z, y", [generate_test_data() for _ in range(5)])
 # def test_getRLComponent(X, Z, y):
@@ -91,35 +92,35 @@ def test_fastkast_component_single_trait(X, Z, y):
     """
     fastkast_component = FastKASTComponent(X, Z, y)
     results = fastkast_component.run()
-    
-    ## Test p-value generation process
+
+    # Test p-value generation process
     assert "pval" in results
-    assert isinstance(results["pval"][0][0], float) 
-    
-    ## Test kernel construction
-    ### Test quadOnly arg
+    assert isinstance(results["pval"][0][0], float)
+
+    # Test kernel construction
+    # Test quadOnly arg
     fastkast_component = FastKASTComponent(X, Z, y, MapFunc='quadOnly')
     results = fastkast_component.run()
     assert fastkast_component.Z.shape == (100, 10)
-    
-    ### Test rbf arg
+
+    # Test rbf arg
     fastkast_component = FastKASTComponent(X, Z, y, MapFunc='rbf', D=50)
     results = fastkast_component.run()
     assert fastkast_component.Z.shape == (100, 50)
-    
-    ### Test customized kernel
+
+    # Test customized kernel
     def mapping(Z):
         mapping_func = PolynomialCountSketch(n_components=50)
         Z = mapping_func.fit_transform(Z)
         return Z
-    
+
     fastkast_component = FastKASTComponent(X, Z, y, mapping=mapping)
     results = fastkast_component.run()
     assert fastkast_component.Z.shape == (100, 50)
 
     # Test with variance component estimation (if implemented)
     if fastkast_component.VarCompEst:
-        assert "varcomp" in results 
+        assert "varcomp" in results
         # Add assertions for the expected structure and values of 'varcomp'
         assert isinstance(results["varcomp"], tuple)  # Example assertion
 
