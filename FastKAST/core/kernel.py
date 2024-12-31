@@ -1,6 +1,6 @@
 import numpy as np
 from numba import jit
-
+from scipy import stats
 
 @jit(nopython=True)
 def sin_cos(X, method='sin'):
