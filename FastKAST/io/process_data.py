@@ -9,7 +9,7 @@ from tqdm import tqdm as tqdm
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import PolynomialFeatures
 from bed_reader import open_bed
-
+from FastKAST.io.process_file import dumpfile
 
 def impute_def(x):
     col_mean = np.nanmean(x, axis=0)
@@ -136,6 +136,7 @@ def geno_phen_processing_contig(args):
 
     # filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
     filename = args.filename
+    results = []
     if args.thread == 1:
         count = 0
         for colnum in tqdm(range(0, gene_annot.shape[1])):
