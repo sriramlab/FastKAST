@@ -134,18 +134,18 @@ def geno_phen_processing_contig(args):
 
     return G, Y, covarfile, Yeffect, gene_annot,
 
-    # filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
-    filename = args.filename
-    results = []
-    if args.thread == 1:
-        count = 0
-        for colnum in tqdm(range(0, gene_annot.shape[1])):
-            count += 1
-            annot_row = gene_annot[:, colnum]
-            results.append(paraCompute(annot_row))
-            dumpfile(results,
-                     savepath,
-                     filename + '_' + str(count) + '.pkl',
-                     overwrite=True)
-            if count > 1:
-                os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
+    # # filename = f'{args.phen}_w{wSize}_D{Map_Dim}.pkl'
+    # filename = args.filename
+    # results = []
+    # if args.thread == 1:
+    #     count = 0
+    #     for colnum in tqdm(range(0, gene_annot.shape[1])):
+    #         count += 1
+    #         annot_row = gene_annot[:, colnum]
+    #         results.append(paraCompute(annot_row))
+    #         dumpfile(results,
+    #                  savepath,
+    #                  filename + '_' + str(count) + '.pkl',
+    #                  overwrite=True)
+    #         if count > 1:
+    #             os.remove(savepath + filename + '_' + str(count - 1) + '.pkl')
